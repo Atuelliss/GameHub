@@ -6,8 +6,7 @@ A thrilling game of chance where users can bet credits or tokens on Russian Roul
 
 To install this cog, run the following commands in your Red Discord Bot:
 
-
-Replace `<repository-url>` with the URL to your GitHub repository.
+https://github.com/Atuelliss/GameHub.git
 
 ## Setup
 
