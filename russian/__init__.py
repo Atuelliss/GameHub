@@ -1,4 +1,4 @@
-from .main import RussianRoulette
+from .main import Russian
 
 async def setup(bot):
-    await bot.add_cog(RussianRoulette(bot))
+    await bot.add_cog(Russian(bot))

@@ -4,13 +4,16 @@ A thrilling game of chance where users can bet credits or tokens on Russian Roul
 
 ## Installation
 
-To install this cog, run the following commands in your Red Discord Bot:
+To install this cog manually, run the following commands in your Red Discord Bot:
 
-https://github.com/Atuelliss/GameHub.git
+[p]repo add GameHub https://github.com/Atuelliss/GameHub.git
+[p]cog install GameHub russian
 
 ## Setup
 
-- We highly recommend you set a discord alias for [p]russian as "rr".
+- We highly recommend you set the following discord aliases:
+  * russian as "rr".
+  * russianlb as "rrlb".
 - Remember to decide if you want to use the Token system, or the Direct Redbot banking system, and set it appropriately before gameplay.
 - Make sure you have the bank conversion on/off to your preference.
 - Set whatever you allowed channels for the commands that you'd like, or leave it blank to permit them in all channels.

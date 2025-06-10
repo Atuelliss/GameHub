@@ -15,7 +15,7 @@ from .tasks import TaskLoops
 log = logging.getLogger("red.rroulette")
 
 
-class RussianRoulette(
+class Russian(
     Commands, Listeners, TaskLoops, Leaderboard, commands.Cog, metaclass=CompositeMetaClass  # Added Leaderboard
 ):
     """A game of chance where players risk it all for rewards"""
