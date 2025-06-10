@@ -46,7 +46,7 @@ def channel_check():
     return commands.check(predicate)
 
 class Commands:
-    @commands.group(name="russian", aliases=["rr"], invoke_without_command=True)
+    @commands.group(name="russian", invoke_without_command=True)
     @channel_check()
     async def russian(self, ctx, mode: str, bet: int, *players: discord.Member):
         """Russian Roulette game for Solo or Challenge mode!! (Up to 3 total Players)\n
@@ -1118,8 +1118,12 @@ class Commands:
                 new_description = embed.description.split("\n\nTime remaining:")[0] + f"\n\nTime remaining: {i} seconds"
                 embed.description = new_description
                 
-                # Edit the message with updated countdown
-                await message.edit(embed=embed)
+                try:
+                    # Edit the message with updated countdown
+                    await message.edit(embed=embed)
+                except discord.NotFound:
+                    # Message was deleted, stop the countdown
+                    return
                 
                 # Wait 1 second
                 await asyncio.sleep(1)
@@ -1343,7 +1347,7 @@ class Commands:
         except asyncio.TimeoutError:
             await ctx.send("❌ Conversion cancelled due to timeout.")
 
-    @commands.command(name="rrcommands", aliases=["russiancommands", "rrhelp", "russianhelp"])
+    @commands.command(name="russiancommands", aliases=["rrcommands"])
     @channel_check()
     async def rr_commands(self, ctx):
         """Display all Russian Roulette commands you have access to"""
@@ -1362,7 +1366,8 @@ class Commands:
             "`russian solo <bet>` - Play a solo game of Russian Roulette",
             "`russian challenge <bet> [@player1] [@player2]` - Challenge up to 2 players",
             "`rrstats [@player]` - View your stats or another player's stats",
-            "`russianlb` or `rrlb` - View the leaderboard"
+            "`russianlb` or `rrlb` - View the leaderboard",
+            "`russianconvert` - Convert Tokens/Discord Credits between each other in Token-mode.",
         ]
     
         # Check if token mode is enabled to show conversion commands

@@ -212,7 +212,7 @@ class LeaderboardView(View):
 class Leaderboard:
     """Mixin for Russian Roulette cog that handles leaderboard functionality"""
     
-    @commands.command(name="russianlb", aliases=["rrlb"])
+    @commands.command(name="russianlb")
     @channel_check()  # Apply the channel check here
     async def russianlb_command(self, ctx):
         """Show the interactive Russian Roulette leaderboard"""
