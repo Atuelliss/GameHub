@@ -71,7 +71,7 @@ class GuildSettings(Base):
     
     # Russian Roulette settings
     min_bet: int = 100
-    max_bet: int = 3000
+    max_bet: int = 1000
     token_to_discord_ratio: int = 500 # How many tokens equal 1 discord credit
 
     token_mode_enabled: bool = False  # Whether token mode is enabled
