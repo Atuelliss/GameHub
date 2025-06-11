@@ -35,12 +35,12 @@ def channel_check():
                 allowed_channels.append(channel.mention)
         
         # Format allowed channels for the error message
-        if allowed_channels:
-            channels_str = ", ".join(allowed_channels)
-            await ctx.send(f"❌ Russian Roulette commands can only be used in these channels: {channels_str}")
-        else:
-            await ctx.send("❌ Russian Roulette commands cannot be used in this channel.")
-        
+#        if allowed_channels:
+#            channels_str = ", ".join(allowed_channels)
+#            await ctx.send(f"❌ Russian Roulette commands can only be used in these channels: {channels_str}")
+#        else:
+#            await ctx.send("❌ Russian Roulette commands cannot be used in this channel.")
+#        
         return False
         
     return commands.check(predicate)
