@@ -43,7 +43,8 @@ def channel_check():
             channels_str = ", ".join(allowed_channels)
             await ctx.send(f"❌ Russian Roulette commands can only be used in these channels: {channels_str}")
         else:
-            await ctx.send("❌ Russian Roulette commands cannot be used in this channel.")
+            pass
+#            await ctx.send("❌ Russian Roulette commands cannot be used in this channel.")
         
         return False
         
