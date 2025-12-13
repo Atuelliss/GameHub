@@ -46,6 +46,14 @@ class SpawnView(discord.ui.View):
             # Acknowledge the click silently (updates the view state but changes nothing visible)
             await interaction.response.edit_message(view=self)
         else:
+            # Defer the interaction to prevent timeout
+            await interaction.response.defer()
+
+            # Re-check captured state to prevent race conditions
+            if self.captured:
+                await interaction.followup.send("This creature has already been captured!", ephemeral=True)
+                return
+
             # Check for failure chance
             fail_chance = conf.spawn_fail_chance
             if random.randint(1, 100) <= fail_chance:
@@ -69,7 +77,7 @@ class SpawnView(discord.ui.View):
                 button.label = "Escaped"
                 button.style = discord.ButtonStyle.danger
                 
-                await interaction.response.edit_message(embed=embed, view=self)
+                await interaction.message.edit(embed=embed, view=self)
                 return
 
             # Captured!
@@ -110,7 +118,7 @@ class SpawnView(discord.ui.View):
             embed.set_footer(text=f"Captured by {interaction.user.display_name}!")
             embed.color = discord.Color.green()
             
-            await interaction.response.edit_message(embed=embed, view=self)
+            await interaction.message.edit(embed=embed, view=self)
 
             # Achievements
             await self.cog.check_achievement(user_conf, "first_capture", interaction)
