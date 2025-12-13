@@ -13,7 +13,7 @@ from .common.models import DB
 from .listeners import Listeners
 from .tasks import TaskLoops
 from .main_helper import MainHelper
-from .databases.gameinfo import select_random_creature, type_events
+from .databases.gameinfo import select_random_creature, type_events, all_modifiers
 from .databases.creatures import creature_library
 from .databases.achievements import achievement_library
 from .views import SpawnView, SetupView
@@ -1176,8 +1176,11 @@ class DinoCollector(
         await ctx.send_help(ctx.command)
 
     @dcspawn.command(name="random")
-    async def dcspawn_random(self, ctx: commands.Context):
-        """Spawn a random dino."""
+    async def dcspawn_random(self, ctx: commands.Context, channel: discord.TextChannel = None):
+        """Spawn a random dino.
+        
+        Optionally specify a channel to spawn in. If a channel is specified, the command message will be deleted.
+        """
         conf = self.db.get_conf(ctx.guild)
         result = select_random_creature(
             event_mode_enabled=conf.event_mode_enabled,
@@ -1186,8 +1189,16 @@ class DinoCollector(
         if result:
             embed, creature_data = result
             view = SpawnView(self, creature_data)
-            msg = await ctx.send(embed=embed, view=view)
+            
+            target_channel = channel or ctx.channel
+            msg = await target_channel.send(embed=embed, view=view)
             view.message = msg
+            
+            if channel:
+                try:
+                    await ctx.message.delete()
+                except (discord.Forbidden, discord.HTTPException):
+                    pass
         else:
             await ctx.send("No creatures available.")
 
@@ -1227,6 +1238,63 @@ class DinoCollector(
             view.message = msg
         else:
             await ctx.send(f"Could not spawn creature with modifier '{modifier}'. Valid modifiers: normal, muscular, young, sickly, withered, shiny, corrupted.")
+
+    @dcspawn.command(name="full")
+    async def dcspawn_full(self, ctx: commands.Context, modifier: str, creature_key: str, channel: discord.TextChannel = None):
+        """Spawn a specific dino with a specific modifier.
+        
+        <modifier>: shiny, corrupted, normal, etc.
+        <creature_key>: The key name of the creature (e.g. achatina, rex).
+        [channel]: Optional channel to spawn in.
+        """
+        # Validate creature
+        creature_key = creature_key.lower()
+        if creature_key not in creature_library:
+            await ctx.send(f"Creature `{creature_key}` not found.")
+            return
+            
+        creature = creature_library[creature_key]
+        
+        # Validate modifier
+        modifier = modifier.lower()
+        if modifier not in all_modifiers:
+             await ctx.send(f"Modifier `{modifier}` not found. Valid modifiers: {', '.join(all_modifiers.keys())}")
+             return
+             
+        modifier_value = all_modifiers[modifier]
+        
+        # Calculate value
+        min_val, max_val = creature["value"]
+        base_value = random.randint(min_val, max_val)
+        total_value = base_value + modifier_value
+        if total_value < 1:
+            total_value = 1
+            
+        # Prepare embed
+        embed = discord.Embed(title=f"A {modifier} {creature['name']} has appeared!")
+        if creature["image"]:
+            embed.set_thumbnail(url=creature["image"])
+        embed.add_field(name="DinoCoin Value", value=str(total_value), inline=True)
+        
+        creature_data = {
+            "name": creature["name"],
+            "modifier": modifier,
+            "rarity": creature["rarity"],
+            "value": total_value,
+            "image": creature["image"]
+        }
+        
+        view = SpawnView(self, creature_data)
+        
+        target_channel = channel or ctx.channel
+        msg = await target_channel.send(embed=embed, view=view)
+        view.message = msg
+        
+        if channel:
+            try:
+                await ctx.message.delete()
+            except (discord.Forbidden, discord.HTTPException):
+                pass
 
     @dcset.command()
     async def mode(self, ctx: commands.Context, mode: str):
