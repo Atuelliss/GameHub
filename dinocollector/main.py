@@ -2,6 +2,7 @@ import asyncio
 import logging
 import discord
 import time
+import random
 
 from redbot.core import commands, bank
 from redbot.core.bot import Red
