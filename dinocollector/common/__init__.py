@@ -144,7 +144,12 @@ class Base(BaseModel):
     @classmethod
     def from_file(cls, path: Path) -> Base:
         if not path.exists():
-            raise FileNotFoundError(f"File not found: {path}")
+            # Create default instance
+            instance = cls()
+            # Save to file
+            instance.to_file(path)
+            return instance
+
         if not path.is_file():
             raise IsADirectoryError(f"Path is not a file: {path}")
         if VERSION >= "2.0.1":
