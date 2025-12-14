@@ -197,7 +197,17 @@ class DinoCollector(
                 
         if newly_unlocked:
             # Filter out any that aren't in the library to prevent crashes
-            newly_unlocked = [aid for aid in newly_unlocked if aid in achievement_library]
+            valid_unlocked = []
+            for aid in newly_unlocked:
+                if aid in achievement_library:
+                    valid_unlocked.append(aid)
+                else:
+                    log.warning(f"Achievement '{aid}' triggered but not found in library.")
+            
+            newly_unlocked = valid_unlocked
+            
+            if not newly_unlocked:
+                return
             
             total_reward = 0
             description = ""
