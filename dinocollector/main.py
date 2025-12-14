@@ -16,7 +16,7 @@ from .tasks import TaskLoops
 from .main_helper import MainHelper
 from .databases.gameinfo import select_random_creature, type_events, all_modifiers
 from .databases.creatures import creature_library
-from .databases import achievements
+from .databases.achievements import achievement_library
 from .views import SpawnView, SetupView
 
 log = logging.getLogger("red.dinocollector")
@@ -67,7 +67,7 @@ class DinoCollector(
 
     async def check_achievement(self, user_conf, achievement_id: str, messageable):
         """Check and award achievement if not already unlocked."""
-        if achievement_id not in achievements.achievement_library:
+        if achievement_id not in achievement_library:
             return
 
         # Check if already unlocked
@@ -75,7 +75,7 @@ class DinoCollector(
             return
             
         # Unlock
-        ach_data = achievements.achievement_library[achievement_id]
+        ach_data = achievement_library[achievement_id]
         user_conf.achievement_log.append({"id": achievement_id, "timestamp": time.time()})
         
         # Reward
@@ -107,43 +107,6 @@ class DinoCollector(
 
     async def sync_achievements(self, ctx: commands.Context, user: discord.Member):
         """Retroactively check for achievements."""
-        # Ensure library is up to date
-        import importlib
-        importlib.reload(achievements)
-        
-        # Emergency patch for missing keys
-        missing_keys = {
-            "first_aberrant": {
-                "name": "Aberrant Hunter",
-                "description": "Captured your first Aberrant Dinosaur!",
-                "reward": 15,
-                "hint": "It's an Aberration!"
-            },
-            "first_flee": {
-                "name": "It didn't like you!",
-                "description": "A dinosaur fled from you!",
-                "reward": 10,
-                "hint": "Sometimes they just don't want to be caught."
-            },
-            "first_log_sold": {
-                "name": "Book Trader",
-                "description": "Sold your Explorer Log for the first time!",
-                "reward": 75,
-                "hint": "Good books must be shared!"
-            },
-            "first_dino_sold": {
-                "name": "Letting Go!",
-                "description": "Sold your first Dino!",
-                "reward": 25,
-                "hint": "It's hard to let go of the first one."
-            }
-        }
-        
-        for k, v in missing_keys.items():
-            if k not in achievements.achievement_library:
-                log.warning(f"Patching missing achievement key: {k}")
-                achievements.achievement_library[k] = v
-
         conf = self.db.get_conf(ctx.guild)
         user_conf = conf.get_user(user)
         
@@ -170,17 +133,6 @@ class DinoCollector(
             has_shiny = any(d.get("modifier", "").lower() == "shiny" for d in user_conf.current_dino_inv)
             if has_shiny:
                 newly_unlocked.append("first_shiny")
-
-        # 3.5 Aberrant Hunter
-        if not is_unlocked("first_aberrant"):
-            has_aberrant = any(d.get("modifier", "").lower() == "aberrant" for d in user_conf.current_dino_inv)
-            if has_aberrant:
-                newly_unlocked.append("first_aberrant")
-
-        # 3.6 It didn't like you! (First Flee)
-        if not is_unlocked("first_flee"):
-            if user_conf.total_escaped > 0:
-                newly_unlocked.append("first_flee")
                 
         # 4. Expansionist (First Upgrade)
         if not is_unlocked("first_upgrade"):
@@ -199,16 +151,6 @@ class DinoCollector(
                 
         # 7. Researcher (First Log Check) - Cannot check retroactively
         
-        # 7.5 Book Trader (First Log Sold)
-        if not is_unlocked("first_log_sold"):
-            if user_conf.explorer_logs_sold > 0:
-                newly_unlocked.append("first_log_sold")
-
-        # 7.6 Letting Go! (First Dino Sold)
-        if not is_unlocked("first_dino_sold"):
-            if user_conf.total_ever_sold > 0:
-                newly_unlocked.append("first_dino_sold")
-
         # 8. Generous Soul (First Gift) - Cannot check retroactively
         
         # 9. Trader (First Trade)
@@ -233,24 +175,11 @@ class DinoCollector(
                 newly_unlocked.append("first_buddy")
                 
         if newly_unlocked:
-            # Filter out any that aren't in the library to prevent crashes
-            valid_unlocked = []
-            for aid in newly_unlocked:
-                if aid in achievements.achievement_library:
-                    valid_unlocked.append(aid)
-                else:
-                    log.warning(f"Achievement '{aid}' triggered but not found in library.")
-            
-            newly_unlocked = valid_unlocked
-            
-            if not newly_unlocked:
-                return
-            
             total_reward = 0
             description = ""
             
             for aid in newly_unlocked:
-                ach_data = achievements.achievement_library[aid]
+                ach_data = achievement_library[aid]
                 user_conf.achievement_log.append({"id": aid, "timestamp": time.time()})
                 reward = ach_data["reward"]
                 user_conf.has_dinocoins += reward
