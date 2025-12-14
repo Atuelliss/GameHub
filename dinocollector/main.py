@@ -52,10 +52,6 @@ class DinoCollector(
         super().__init__(bot)
         self.bot: Red = bot
         self.db: DB = DB()
-        
-        # Force reload to pick up new keys
-        import importlib
-        importlib.reload(achievements)
 
         # States
         self._saving = False
@@ -111,6 +107,43 @@ class DinoCollector(
 
     async def sync_achievements(self, ctx: commands.Context, user: discord.Member):
         """Retroactively check for achievements."""
+        # Ensure library is up to date
+        import importlib
+        importlib.reload(achievements)
+        
+        # Emergency patch for missing keys
+        missing_keys = {
+            "first_aberrant": {
+                "name": "Aberrant Hunter",
+                "description": "Captured your first Aberrant Dinosaur!",
+                "reward": 15,
+                "hint": "It's an Aberration!"
+            },
+            "first_flee": {
+                "name": "It didn't like you!",
+                "description": "A dinosaur fled from you!",
+                "reward": 10,
+                "hint": "Sometimes they just don't want to be caught."
+            },
+            "first_log_sold": {
+                "name": "Book Trader",
+                "description": "Sold your Explorer Log for the first time!",
+                "reward": 75,
+                "hint": "Good books must be shared!"
+            },
+            "first_dino_sold": {
+                "name": "Letting Go!",
+                "description": "Sold your first Dino!",
+                "reward": 25,
+                "hint": "It's hard to let go of the first one."
+            }
+        }
+        
+        for k, v in missing_keys.items():
+            if k not in achievements.achievement_library:
+                log.warning(f"Patching missing achievement key: {k}")
+                achievements.achievement_library[k] = v
+
         conf = self.db.get_conf(ctx.guild)
         user_conf = conf.get_user(user)
         
