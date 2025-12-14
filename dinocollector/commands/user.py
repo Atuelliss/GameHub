@@ -43,7 +43,7 @@ class User(MixinMeta):
         users_data.sort(key=lambda x: x[1].total_ever_claimed, reverse=True)
         
         # Pagination logic
-        per_page = 10
+        per_page = 5
         pages = []
         num_pages = math.ceil(len(users_data) / per_page)
         
