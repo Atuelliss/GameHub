@@ -196,6 +196,9 @@ class DinoCollector(
                 newly_unlocked.append("first_buddy")
                 
         if newly_unlocked:
+            # Filter out any that aren't in the library to prevent crashes
+            newly_unlocked = [aid for aid in newly_unlocked if aid in achievement_library]
+            
             total_reward = 0
             description = ""
             
