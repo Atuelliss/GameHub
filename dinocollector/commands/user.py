@@ -275,9 +275,19 @@ class User(MixinMeta):
         # Determine what to sell
         to_sell_indices = []
         selection = selection.lower()
+        skipped_special = False
         
         if selection == "all":
-            to_sell_indices = list(range(len(user_conf.current_dino_inv)))
+            # Filter out shiny and event dinos
+            for i, dino in enumerate(user_conf.current_dino_inv):
+                is_shiny = dino.get("modifier", "").lower() == "shiny"
+                is_event = dino.get("rarity", "").lower() == "event" or dino.get("version", "").lower() == "event"
+                
+                if is_shiny or is_event:
+                    skipped_special = True
+                else:
+                    to_sell_indices.append(i)
+                    
         elif selection.isdigit():
             idx = int(selection) - 1
             if 0 <= idx < len(user_conf.current_dino_inv):
@@ -307,13 +317,35 @@ class User(MixinMeta):
             if target_rarity:
                 for i, dino in enumerate(user_conf.current_dino_inv):
                     if dino.get("rarity") == target_rarity:
-                        to_sell_indices.append(i)
+                        # Check for shiny/event exclusion even in rarity selection (unless they specifically asked for 'event')
+                        is_shiny = dino.get("modifier", "").lower() == "shiny"
+                        # If they asked for 'event', don't skip events. But still skip shinies? 
+                        # The request said "if there is a shiny or event dino within the inventory it would be excluded"
+                        # I'll assume if they explicitly type "dcsell event", they WANT to sell events.
+                        # But if they type "dcsell rare" and there is a shiny rare, skip it.
+                        
+                        should_skip = False
+                        if is_shiny:
+                            should_skip = True
+                        
+                        if target_rarity != "event":
+                             is_event = dino.get("version", "").lower() == "event"
+                             if is_event:
+                                 should_skip = True
+                        
+                        if should_skip:
+                            skipped_special = True
+                        else:
+                            to_sell_indices.append(i)
             else:
                 await ctx.send("Invalid selection. Use a number, 'all', or a rarity (common, rare, etc).")
                 return
 
         if not to_sell_indices:
-            await ctx.send("No dinos matched your selection.")
+            if skipped_special:
+                await ctx.send("No dinos matched your selection (Shiny and Event dinos are protected from bulk selling).")
+            else:
+                await ctx.send("No dinos matched your selection.")
             return
 
         # Calculate totals
@@ -428,6 +460,9 @@ class User(MixinMeta):
                     f"**Total Received: {total_value} DinoCoins**\n"
                     f"New Balance: {user_conf.has_dinocoins}"
                 )
+            
+            if skipped_special:
+                embed.description += "\n\n**Note:** Your shiny and event dinos were not sold. Please sell those individually if you wish to do so."
 
             embed.color = discord.Color.green()
             await msg.edit(embed=embed, view=None)
