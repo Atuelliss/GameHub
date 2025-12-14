@@ -16,7 +16,7 @@ from .tasks import TaskLoops
 from .main_helper import MainHelper
 from .databases.gameinfo import select_random_creature, type_events, all_modifiers
 from .databases.creatures import creature_library
-from .databases.achievements import achievement_library
+from .databases import achievements
 from .views import SpawnView, SetupView
 
 log = logging.getLogger("red.dinocollector")
@@ -52,6 +52,10 @@ class DinoCollector(
         super().__init__(bot)
         self.bot: Red = bot
         self.db: DB = DB()
+        
+        # Force reload to pick up new keys
+        import importlib
+        importlib.reload(achievements)
 
         # States
         self._saving = False
@@ -67,7 +71,7 @@ class DinoCollector(
 
     async def check_achievement(self, user_conf, achievement_id: str, messageable):
         """Check and award achievement if not already unlocked."""
-        if achievement_id not in achievement_library:
+        if achievement_id not in achievements.achievement_library:
             return
 
         # Check if already unlocked
@@ -75,7 +79,7 @@ class DinoCollector(
             return
             
         # Unlock
-        ach_data = achievement_library[achievement_id]
+        ach_data = achievements.achievement_library[achievement_id]
         user_conf.achievement_log.append({"id": achievement_id, "timestamp": time.time()})
         
         # Reward
@@ -199,7 +203,7 @@ class DinoCollector(
             # Filter out any that aren't in the library to prevent crashes
             valid_unlocked = []
             for aid in newly_unlocked:
-                if aid in achievement_library:
+                if aid in achievements.achievement_library:
                     valid_unlocked.append(aid)
                 else:
                     log.warning(f"Achievement '{aid}' triggered but not found in library.")
@@ -213,7 +217,7 @@ class DinoCollector(
             description = ""
             
             for aid in newly_unlocked:
-                ach_data = achievement_library[aid]
+                ach_data = achievements.achievement_library[aid]
                 user_conf.achievement_log.append({"id": aid, "timestamp": time.time()})
                 reward = ach_data["reward"]
                 user_conf.has_dinocoins += reward
