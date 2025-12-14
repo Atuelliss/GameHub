@@ -20,8 +20,14 @@ class LeaderboardView(discord.ui.View):
                 pass
 
     def update_buttons(self):
-        self.previous_page.disabled = self.current_page == 0
-        self.next_page.disabled = self.current_page == len(self.pages) - 1
+        # Circular navigation: buttons are always enabled if there's more than 1 page
+        if len(self.pages) > 1:
+            self.previous_page.disabled = False
+            self.next_page.disabled = False
+        else:
+            self.previous_page.disabled = True
+            self.next_page.disabled = True
+            
         self.close_view.label = "X"
         self.close_view.style = discord.ButtonStyle.danger
 
@@ -33,7 +39,10 @@ class LeaderboardView(discord.ui.View):
 
     @discord.ui.button(label="<", style=discord.ButtonStyle.primary)
     async def previous_page(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.current_page -= 1
+        if self.current_page == 0:
+            self.current_page = len(self.pages) - 1
+        else:
+            self.current_page -= 1
         self.update_buttons()
         await interaction.response.edit_message(embed=self.pages[self.current_page], view=self)
 
@@ -44,6 +53,9 @@ class LeaderboardView(discord.ui.View):
 
     @discord.ui.button(label=">", style=discord.ButtonStyle.primary)
     async def next_page(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.current_page += 1
+        if self.current_page == len(self.pages) - 1:
+            self.current_page = 0
+        else:
+            self.current_page += 1
         self.update_buttons()
         await interaction.response.edit_message(embed=self.pages[self.current_page], view=self)
