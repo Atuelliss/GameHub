@@ -64,6 +64,9 @@ class SpawnView(discord.ui.View):
                 # Update stats
                 user_conf.total_escaped += 1
                 self.cog.save()
+
+                # Achievements
+                await self.cog.check_achievement(user_conf, "first_flee", interaction)
                 
                 # Always show fled message
                 embed = self.message.embeds[0]
@@ -128,6 +131,8 @@ class SpawnView(discord.ui.View):
                 await self.cog.check_achievement(user_conf, "first_corrupted", interaction)
             elif modifier == "shiny":
                 await self.cog.check_achievement(user_conf, "first_shiny", interaction)
+            elif modifier == "aberrant":
+                await self.cog.check_achievement(user_conf, "first_aberrant", interaction)
                 
             # Check full inventory
             current_size = conf.base_inventory_size + (user_conf.current_inventory_upgrade_level * conf.inventory_per_upgrade)
