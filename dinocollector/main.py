@@ -151,17 +151,7 @@ class DinoCollector(
                 newly_unlocked.append("first_upgrade")
                 
         # 5. Prepared (First Lure Purchase)
-        if7.5 Book Trader (First Log Sold)
-        if not is_unlocked("first_log_sold"):
-            if user_conf.explorer_logs_sold > 0:
-                newly_unlocked.append("first_log_sold")
-
-        # 7.6 Letting Go! (First Dino Sold)
-        if not is_unlocked("first_dino_sold"):
-            if user_conf.total_ever_sold > 0:
-                newly_unlocked.append("first_dino_sold")
-
-        #  not is_unlocked("first_lure_purchase"):
+        if not is_unlocked("first_lure_purchase"):
             if user_conf.has_lure or user_conf.last_lure_use > 0:
                 newly_unlocked.append("first_lure_purchase")
                 
@@ -182,7 +172,17 @@ class DinoCollector(
         # 10. Hoarder (Full Inventory)
         if not is_unlocked("full_inventory"):
             current_size = conf.base_inventory_size + (user_conf.current_inventory_upgrade_level * conf.inventory_per_upgrade)
-            if len(user_conf.current_dino_inv) >= current_size:
+          7.5 Book Trader (First Log Sold)
+        if not is_unlocked("first_log_sold"):
+            if user_conf.explorer_logs_sold > 0:
+                newly_unlocked.append("first_log_sold")
+
+        # 7.6 Letting Go! (First Dino Sold)
+        if not is_unlocked("first_dino_sold"):
+            if user_conf.total_ever_sold > 0:
+                newly_unlocked.append("first_dino_sold")
+
+        #   if len(user_conf.current_dino_inv) >= current_size:
                 newly_unlocked.append("full_inventory")
                 
         # 11. Maxed Out (Max Upgrade)
