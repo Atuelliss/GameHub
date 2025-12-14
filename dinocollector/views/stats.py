@@ -54,6 +54,9 @@ class StatsView(discord.ui.View):
 
     @discord.ui.button(label="Achievements", emoji="🏆", style=discord.ButtonStyle.secondary)
     async def achievements_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        # Sync achievements
+        await self.cog.sync_achievements(self.ctx, self.target)
+
         conf = self.cog.db.get_conf(self.ctx.guild)
         user_conf = conf.get_user(self.target)
         
