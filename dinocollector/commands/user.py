@@ -202,6 +202,9 @@ class User(MixinMeta):
             user_conf.explorer_logs_sold += 1
             
             self.save()
+
+            # Achievements
+            await self.check_achievement(user_conf, "first_log_sold", ctx)
             
             await msg.edit(content=f"You sold your Explorer Log for {reward} DinoCoins!", view=None)
         else:
@@ -440,6 +443,9 @@ class User(MixinMeta):
             user_conf.buddy_bonus_total_gained += bonus_amount
             
             self.save()
+
+            # Achievements
+            await self.check_achievement(user_conf, "first_dino_sold", ctx)
             
             embed.title = "Sale Complete"
             if bonus_amount > 0:
