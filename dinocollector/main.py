@@ -133,6 +133,17 @@ class DinoCollector(
             has_shiny = any(d.get("modifier", "").lower() == "shiny" for d in user_conf.current_dino_inv)
             if has_shiny:
                 newly_unlocked.append("first_shiny")
+
+        # 3.5 Aberrant Hunter
+        if not is_unlocked("first_aberrant"):
+            has_aberrant = any(d.get("modifier", "").lower() == "aberrant" for d in user_conf.current_dino_inv)
+            if has_aberrant:
+                newly_unlocked.append("first_aberrant")
+
+        # 3.6 It didn't like you! (First Flee)
+        if not is_unlocked("first_flee"):
+            if user_conf.total_escaped > 0:
+                newly_unlocked.append("first_flee")
                 
         # 4. Expansionist (First Upgrade)
         if not is_unlocked("first_upgrade"):
@@ -140,7 +151,17 @@ class DinoCollector(
                 newly_unlocked.append("first_upgrade")
                 
         # 5. Prepared (First Lure Purchase)
-        if not is_unlocked("first_lure_purchase"):
+        if7.5 Book Trader (First Log Sold)
+        if not is_unlocked("first_log_sold"):
+            if user_conf.explorer_logs_sold > 0:
+                newly_unlocked.append("first_log_sold")
+
+        # 7.6 Letting Go! (First Dino Sold)
+        if not is_unlocked("first_dino_sold"):
+            if user_conf.total_ever_sold > 0:
+                newly_unlocked.append("first_dino_sold")
+
+        #  not is_unlocked("first_lure_purchase"):
             if user_conf.has_lure or user_conf.last_lure_use > 0:
                 newly_unlocked.append("first_lure_purchase")
                 
