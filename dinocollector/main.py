@@ -245,7 +245,7 @@ class DinoCollector(
 #-------- General Commands --------#
 
     @commands.command()
-    @commands.check(is_admin_or_mod)
+    @commands.admin_or_permissions(manage_guild=True)
     async def dcsetup(self, ctx: commands.Context):
         """Run the DinoCollector setup wizard."""
         await ctx.send(
@@ -585,7 +585,7 @@ class DinoCollector(
         embed.add_field(name="**User Commands**", value=user_cmds, inline=False)
         
         # Admin Commands
-        is_admin = await is_admin_or_mod(ctx)
+        is_admin = await self.bot.is_admin(ctx.author)
         if is_admin:
             admin_cmds = (
                 "**dcset adminrole <role>** - Set the admin role.\n"
@@ -606,7 +606,7 @@ class DinoCollector(
 #-------- Admin Commands --------#
 
     @commands.group(invoke_without_command=True)
-    @commands.check(is_admin_or_mod)
+    @commands.admin_or_permissions(manage_guild=True)
     async def dcset(self, ctx: commands.Context):
         """DinoCollector settings group."""
         embed = discord.Embed(title="DinoCollector Admin Settings", color=discord.Color.red())
@@ -1171,7 +1171,7 @@ class DinoCollector(
         await ctx.send(msg)
 
     @commands.group(invoke_without_command=True)
-    @commands.check(is_admin_or_mod)
+    @commands.admin_or_permissions(manage_guild=True)
     async def dcspawn(self, ctx: commands.Context):
         """Admin spawn commands."""
         await ctx.send_help(ctx.command)
