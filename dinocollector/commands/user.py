@@ -202,9 +202,6 @@ class User(MixinMeta):
             user_conf.explorer_logs_sold += 1
             
             self.save()
-
-            # Achievements
-            await self.check_achievement(user_conf, "first_log_sold", ctx)
             
             await msg.edit(content=f"You sold your Explorer Log for {reward} DinoCoins!", view=None)
         else:
@@ -443,9 +440,6 @@ class User(MixinMeta):
             user_conf.buddy_bonus_total_gained += bonus_amount
             
             self.save()
-
-            # Achievements
-            await self.check_achievement(user_conf, "first_dino_sold", ctx)
             
             embed.title = "Sale Complete"
             if bonus_amount > 0:
@@ -493,7 +487,7 @@ class User(MixinMeta):
         
         # Check if user already has a buddy
         if user_conf.buddy_dino:
-            await ctx.send("You already have a buddy! Use `[p]dcbuddy clear` to remove it first.")
+            await ctx.send(f"You already have a buddy! Use `{ctx.clean_prefix}dcbuddy clear` to remove it first.")
             return
 
         # Validate index
@@ -577,7 +571,7 @@ class User(MixinMeta):
         user_conf = conf.get_user(ctx.author)
         
         if not user_conf.buddy_dino:
-            await ctx.send("You don't have a buddy set! Use `[p]dcbuddy set <id>` to set one.")
+            await ctx.send(f"You don't have a buddy set! Use `{ctx.clean_prefix}dcbuddy set <id>` to set one.")
             return
             
         buddy = user_conf.buddy_dino
@@ -745,6 +739,7 @@ class User(MixinMeta):
         elif trade_type == "coin":
             embed.add_field(name="Requesting", value=f"{price} DinoCoins", inline=False)
         elif trade_type == "dino":
+            assert dino_to_receive is not None  # for type checker
             embed.add_field(name=f"{user.display_name} Offers", value=f"{dino_to_receive['modifier']} {dino_to_receive['name']} ({dino_to_receive['rarity']})", inline=False)
 
         embed.set_footer(text="Recipient must accept within 2 minutes.")
@@ -792,6 +787,7 @@ class User(MixinMeta):
                 sender_conf.current_dino_inv.append(dino_to_receive)
                 
                 # Update Log for Sender (since they received a dino)
+                assert dino_to_receive is not None  # for type checker
                 already_in_log_s = any(d.get("name") == dino_to_receive["name"] for d in sender_conf.explorer_log)
                 if not already_in_log_s:
                     sender_conf.explorer_log.append({"name": dino_to_receive["name"]})
@@ -826,6 +822,7 @@ class User(MixinMeta):
             elif trade_type == "coin":
                 desc += f" for **{price}** coins."
             elif trade_type == "dino":
+                assert dino_to_receive is not None  # for type checker
                 desc += f" for **{dino_to_receive['name']}**."
             
             embed.description = desc
@@ -1005,3 +1002,70 @@ class User(MixinMeta):
                 await ctx.send(f"Transaction failed during bank deposit: {e}")
         else:
             await ctx.send("Conversion cancelled.")
+
+    @commands.command()
+    async def dcinvest(self, ctx: commands.Context, amount: int):
+        """Convert server currency to DinoCoins.
+        
+        Usage:
+        [p]dcinvest 500
+        """
+        conf = self.db.get_conf(ctx.guild)
+        user_conf = conf.get_user(ctx.author)
+        
+        if not conf.discord_conversion_enabled:
+            await ctx.send("Discord Currency Conversion is disabled.")
+            return
+            
+        if amount <= 0:
+            await ctx.send("Please enter a positive amount.")
+            return
+            
+        rate = conf.discord_conversion_rate
+        currency_name = await bank.get_currency_name(ctx.guild)
+        
+        try:
+            user_balance = await bank.get_balance(ctx.author)
+        except Exception as e:
+            await ctx.send(f"Could not retrieve your balance: {e}")
+            return
+            
+        if user_balance < amount:
+            await ctx.send(f"You don't have enough {currency_name}! You have {user_balance}.")
+            return
+            
+        # Calculate conversion: 1 discord currency = rate DinoCoins
+        dinocoins_to_receive = amount * rate
+        
+        msg_text = (
+            f"Are you sure you wish to invest **{amount} {currency_name}** for **{dinocoins_to_receive}** DinoCoins?"
+        )
+            
+        view = ConfirmationView(ctx.author, timeout=180)
+        msg = await ctx.send(msg_text, view=view)
+        view.message = msg
+        
+        await view.wait()
+        
+        if view.confirmed:
+            # Re-check balance just in case
+            try:
+                current_balance = await bank.get_balance(ctx.author)
+            except Exception as e:
+                await msg.edit(content=f"Transaction failed: Could not verify balance: {e}", view=None)
+                return
+                
+            if current_balance < amount:
+                await msg.edit(content="Transaction failed: Insufficient funds (balance changed).", view=None)
+                return
+                
+            try:
+                await bank.withdraw_credits(ctx.author, amount)
+                user_conf.has_dinocoins += dinocoins_to_receive
+                user_conf.total_dinocoins_earned += dinocoins_to_receive
+                self.save()
+                await msg.edit(content=f"Successfully invested **{amount} {currency_name}** for **{dinocoins_to_receive}** DinoCoins!", view=None)
+            except Exception as e:
+                await msg.edit(content=f"Transaction failed during bank withdrawal: {e}", view=None)
+        else:
+            await msg.edit(content="Investment cancelled.", view=None)
