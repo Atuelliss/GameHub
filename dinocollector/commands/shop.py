@@ -107,8 +107,6 @@ class Shop(MixinMeta):
         
         self.save()
         
-        await ctx.send(f"🥩 You bought a lure! Use it with `{ctx.prefix}dclure` to spawn a dino.")
-        
         # Achievements
         await self.check_achievement(user_conf, "first_lure_purchase", ctx)
         
