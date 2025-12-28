@@ -574,6 +574,18 @@ class DinoCollector(
         # Check if user is admin
         is_user_admin = await is_admin_or_mod(ctx)
         
+        def has_admin_check(cmd) -> bool:
+            """Check if a command or any of its parents have admin checks."""
+            # Check the command itself
+            for check in cmd.checks:
+                check_name = getattr(check, '__qualname__', str(check))
+                if 'admin' in check_name.lower() or 'manage_guild' in check_name.lower():
+                    return True
+            # Check parent commands
+            if cmd.parent is not None:
+                return has_admin_check(cmd.parent)
+            return False
+        
         # Get all commands from this cog
         for cmd in self.walk_commands():
             # Skip hidden commands
@@ -590,13 +602,8 @@ class DinoCollector(
                 cmd_str += f" {signature}"
             cmd_str += f" - {brief}"
             
-            # Determine if it's an admin command by checking for admin checks
-            is_admin_cmd = False
-            for check in cmd.checks:
-                check_name = getattr(check, '__qualname__', str(check))
-                if 'admin' in check_name.lower() or 'manage_guild' in check_name.lower():
-                    is_admin_cmd = True
-                    break
+            # Determine if it's an admin command by checking for admin checks (including parents)
+            is_admin_cmd = has_admin_check(cmd)
             
             # Check if user can run this command
             try:
