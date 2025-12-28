@@ -566,10 +566,13 @@ class DinoCollector(
     @commands.command()
     async def dccommands(self, ctx: commands.Context):
         """List all available DinoCollector commands."""
-        embed = discord.Embed(title="DinoCollector Commands", color=discord.Color.green())
+        from .views import PaginationView
         
         user_cmds = []
         admin_cmds = []
+        
+        # Check if user is admin
+        is_user_admin = await is_admin_or_mod(ctx)
         
         # Get all commands from this cog
         for cmd in self.walk_commands():
@@ -587,12 +590,6 @@ class DinoCollector(
                 cmd_str += f" {signature}"
             cmd_str += f" - {brief}"
             
-            # Check if user can run this command
-            try:
-                can_run = await cmd.can_run(ctx)
-            except commands.CommandError:
-                can_run = False
-            
             # Determine if it's an admin command by checking for admin checks
             is_admin_cmd = False
             for check in cmd.checks:
@@ -601,10 +598,18 @@ class DinoCollector(
                     is_admin_cmd = True
                     break
             
+            # Check if user can run this command
+            try:
+                can_run = await cmd.can_run(ctx)
+            except commands.CommandError:
+                can_run = False
+            
             if is_admin_cmd:
-                if can_run:
+                # Only add admin commands if user is admin
+                if is_user_admin and can_run:
                     admin_cmds.append(cmd_str)
             else:
+                # Add user commands if they can run them
                 if can_run:
                     user_cmds.append(cmd_str)
         
@@ -612,58 +617,54 @@ class DinoCollector(
         user_cmds.sort()
         admin_cmds.sort()
         
-        # Add user commands field
+        # Build pages (max 20 commands per page)
+        pages = []
+        commands_per_page = 20
+        
+        # Create user command pages
         if user_cmds:
-            # Split into multiple fields if too long (Discord limit is 1024 chars per field)
-            user_text = "\n".join(user_cmds)
-            if len(user_text) <= 1024:
-                embed.add_field(name="**User Commands**", value=user_text, inline=False)
-            else:
-                # Split into chunks
-                chunks = []
-                current_chunk = []
-                current_len = 0
-                for cmd_str in user_cmds:
-                    if current_len + len(cmd_str) + 1 > 1000:
-                        chunks.append("\n".join(current_chunk))
-                        current_chunk = [cmd_str]
-                        current_len = len(cmd_str)
-                    else:
-                        current_chunk.append(cmd_str)
-                        current_len += len(cmd_str) + 1
-                if current_chunk:
-                    chunks.append("\n".join(current_chunk))
-                for i, chunk in enumerate(chunks):
-                    name = f"**User Commands{f' ({i+1})' if len(chunks) > 1 else ''}**"
-                    embed.add_field(name=name, value=chunk, inline=False)
+            for i in range(0, len(user_cmds), commands_per_page):
+                chunk = user_cmds[i:i + commands_per_page]
+                embed = discord.Embed(
+                    title="DinoCollector Commands - User",
+                    color=discord.Color.green()
+                )
+                embed.description = "\n".join(chunk)
+                pages.append(embed)
         
-        # Add admin commands field (only if user has access)
-        if admin_cmds:
-            admin_text = "\n".join(admin_cmds)
-            if len(admin_text) <= 1024:
-                embed.add_field(name="**Admin Commands**", value=admin_text, inline=False)
-            else:
-                chunks = []
-                current_chunk = []
-                current_len = 0
-                for cmd_str in admin_cmds:
-                    if current_len + len(cmd_str) + 1 > 1000:
-                        chunks.append("\n".join(current_chunk))
-                        current_chunk = [cmd_str]
-                        current_len = len(cmd_str)
-                    else:
-                        current_chunk.append(cmd_str)
-                        current_len += len(cmd_str) + 1
-                if current_chunk:
-                    chunks.append("\n".join(current_chunk))
-                for i, chunk in enumerate(chunks):
-                    name = f"**Admin Commands{f' ({i+1})' if len(chunks) > 1 else ''}**"
-                    embed.add_field(name=name, value=chunk, inline=False)
+        # Create admin command pages (only for admins)
+        if is_user_admin and admin_cmds:
+            for i in range(0, len(admin_cmds), commands_per_page):
+                chunk = admin_cmds[i:i + commands_per_page]
+                embed = discord.Embed(
+                    title="DinoCollector Commands - Admin",
+                    color=discord.Color.red()
+                )
+                embed.description = "\n".join(chunk)
+                pages.append(embed)
         
-        if not user_cmds and not admin_cmds:
-            embed.description = "No commands available."
-            
-        await ctx.send(embed=embed)
+        # Handle empty case
+        if not pages:
+            embed = discord.Embed(
+                title="DinoCollector Commands",
+                description="No commands available.",
+                color=discord.Color.green()
+            )
+            await ctx.send(embed=embed)
+            return
+        
+        # Add page numbers to footers
+        total_pages = len(pages)
+        for i, page in enumerate(pages):
+            page.set_footer(text=f"Page {i + 1}/{total_pages}")
+        
+        # If only one page, no need for pagination
+        if total_pages == 1:
+            await ctx.send(embed=pages[0])
+        else:
+            view = PaginationView(pages, ctx.author)
+            msg = await ctx.send(embed=pages[0], view=view)
+            view.message = msg
 
 #-------- Admin Commands --------#
 
