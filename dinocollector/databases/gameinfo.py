@@ -16,7 +16,7 @@ type_rare_mod = {
     "irradiated": -2,
 }
 type_special_mod = {
-    "shiny": 15,
+    "shiny": 25,
     "corrupted": 5,
     "aberrant": 3,
 }
@@ -156,4 +156,5 @@ def select_random_creature(event_mode_enabled=False, event_active_type="", force
     }
     
     return embed, creature_data
+
 
