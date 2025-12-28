@@ -578,8 +578,16 @@ class DinoCollector(
             """Check if a command or any of its parents have admin checks."""
             # Check the command itself
             for check in cmd.checks:
-                check_name = getattr(check, '__qualname__', str(check))
-                if 'admin' in check_name.lower() or 'manage_guild' in check_name.lower():
+                # Get various representations of the check to match against
+                check_qualname = getattr(check, '__qualname__', '') or ''
+                check_name = getattr(check, '__name__', '') or ''
+                check_module = getattr(check, '__module__', '') or ''
+                check_str = str(check)
+                
+                # Combine all representations for comprehensive matching
+                combined = f"{check_qualname} {check_name} {check_module} {check_str}".lower()
+                
+                if 'admin' in combined or 'manage_guild' in combined:
                     return True
             # Check parent commands
             if cmd.parent is not None:
