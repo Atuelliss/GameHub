@@ -568,38 +568,100 @@ class DinoCollector(
         """List all available DinoCollector commands."""
         embed = discord.Embed(title="DinoCollector Commands", color=discord.Color.green())
         
-        # User Commands
-        user_cmds = (
-            "**dccommands** - List all available commands.\n"
-            "**dcinv** - View your inventory.\n"
-            "**dclog** - View your Explorer Log.\n"
-            "**dcstats** - View your stats.\n"
-            "**dcsell <item/all/rarity>** - Sell dinos.\n"
-            "**dcbuddy set <id> / clear** - Manage your buddy dino.\n"
-            "**dctrade <user> <id> [price]** - Trade dinos.\n"
-            "**dclure** - Use a lure.\n"
-            "**dcshop** - View the shop.\n"
-            "**dcshop buy upgrade** - Buy inventory slots.\n"
-            "**dcshop buy lure** - Buy a lure."
-        )
-        embed.add_field(name="**User Commands**", value=user_cmds, inline=False)
+        user_cmds = []
+        admin_cmds = []
         
-        # Admin Commands
-        is_admin = await self.bot.is_admin(ctx.author)
-        if is_admin:
-            admin_cmds = (
-                "**dcset adminrole <role>** - Set the admin role.\n"
-                "**dcset spawn** - Force a test spawn.\n"
-                "**dcset channel <add/remove/list>** - Manage spawn channels.\n"
-                "**dcset mode <message/time>** - Set spawn mode.\n"
-                "**dcset chance <0-100>** - Set spawn chance (message mode).\n"
-                "**dcset interval <seconds>** - Set spawn interval (time mode).\n"
-                "**dcset cooldown <seconds>** - Set spawn cooldown.\n"
-                "**dcset shop <upgrade_price/lure_price/lure_cooldown>** - Shop settings.\n"
-                "**dcset filter <add/remove/list>** - Manage disallowed names.\n"
-                "**dcspawn <random/rarity/modifier>** - Force specific spawns."
-            )
-            embed.add_field(name="**Admin Commands**", value=admin_cmds, inline=False)
+        # Get all commands from this cog
+        for cmd in self.walk_commands():
+            # Skip hidden commands
+            if cmd.hidden:
+                continue
+            
+            # Build command signature
+            cmd_name = cmd.qualified_name
+            signature = cmd.signature.strip() if cmd.signature else ""
+            brief = cmd.short_doc or "No description."
+            
+            cmd_str = f"**{cmd_name}**"
+            if signature:
+                cmd_str += f" {signature}"
+            cmd_str += f" - {brief}"
+            
+            # Check if user can run this command
+            try:
+                can_run = await cmd.can_run(ctx)
+            except commands.CommandError:
+                can_run = False
+            
+            # Determine if it's an admin command by checking for admin checks
+            is_admin_cmd = False
+            for check in cmd.checks:
+                check_name = getattr(check, '__qualname__', str(check))
+                if 'admin' in check_name.lower() or 'manage_guild' in check_name.lower():
+                    is_admin_cmd = True
+                    break
+            
+            if is_admin_cmd:
+                if can_run:
+                    admin_cmds.append(cmd_str)
+            else:
+                if can_run:
+                    user_cmds.append(cmd_str)
+        
+        # Sort commands alphabetically
+        user_cmds.sort()
+        admin_cmds.sort()
+        
+        # Add user commands field
+        if user_cmds:
+            # Split into multiple fields if too long (Discord limit is 1024 chars per field)
+            user_text = "\n".join(user_cmds)
+            if len(user_text) <= 1024:
+                embed.add_field(name="**User Commands**", value=user_text, inline=False)
+            else:
+                # Split into chunks
+                chunks = []
+                current_chunk = []
+                current_len = 0
+                for cmd_str in user_cmds:
+                    if current_len + len(cmd_str) + 1 > 1000:
+                        chunks.append("\n".join(current_chunk))
+                        current_chunk = [cmd_str]
+                        current_len = len(cmd_str)
+                    else:
+                        current_chunk.append(cmd_str)
+                        current_len += len(cmd_str) + 1
+                if current_chunk:
+                    chunks.append("\n".join(current_chunk))
+                for i, chunk in enumerate(chunks):
+                    name = f"**User Commands{f' ({i+1})' if len(chunks) > 1 else ''}**"
+                    embed.add_field(name=name, value=chunk, inline=False)
+        
+        # Add admin commands field (only if user has access)
+        if admin_cmds:
+            admin_text = "\n".join(admin_cmds)
+            if len(admin_text) <= 1024:
+                embed.add_field(name="**Admin Commands**", value=admin_text, inline=False)
+            else:
+                chunks = []
+                current_chunk = []
+                current_len = 0
+                for cmd_str in admin_cmds:
+                    if current_len + len(cmd_str) + 1 > 1000:
+                        chunks.append("\n".join(current_chunk))
+                        current_chunk = [cmd_str]
+                        current_len = len(cmd_str)
+                    else:
+                        current_chunk.append(cmd_str)
+                        current_len += len(cmd_str) + 1
+                if current_chunk:
+                    chunks.append("\n".join(current_chunk))
+                for i, chunk in enumerate(chunks):
+                    name = f"**Admin Commands{f' ({i+1})' if len(chunks) > 1 else ''}**"
+                    embed.add_field(name=name, value=chunk, inline=False)
+        
+        if not user_cmds and not admin_cmds:
+            embed.description = "No commands available."
             
         await ctx.send(embed=embed)
 
