@@ -566,126 +566,42 @@ class DinoCollector(
     @commands.command()
     async def dccommands(self, ctx: commands.Context):
         """List all available DinoCollector commands."""
-        from .views import PaginationView
+        embed = discord.Embed(title="DinoCollector Commands", color=discord.Color.green())
         
-        user_cmds = []
-        admin_cmds = []
+        # User Commands
+        user_cmds = (
+            "**dccommands** - List all available commands.\n"
+            "**dcinv** - View your inventory.\n"
+            "**dclog** - View your Explorer Log.\n"
+            "**dcstats** - View your stats.\n"
+            "**dcsell <item/all/rarity>** - Sell dinos.\n"
+            "**dcbuddy set <id> / clear** - Manage your buddy dino.\n"
+            "**dctrade <user> <id> [price]** - Trade dinos.\n"
+            "**dclure** - Use a lure.\n"
+            "**dcshop** - View the shop.\n"
+            "**dcshop buy upgrade** - Buy inventory slots.\n"
+            "**dcshop buy lure** - Buy a lure."
+        )
+        embed.add_field(name="**User Commands**", value=user_cmds, inline=False)
         
-        # Check if user is admin
-        is_user_admin = await is_admin_or_mod(ctx)
-        
-        def has_admin_check(cmd) -> bool:
-            """Check if a command or any of its parents have admin checks."""
-            # Check the command itself
-            for check in cmd.checks:
-                # Get various representations of the check to match against
-                check_qualname = getattr(check, '__qualname__', '') or ''
-                check_name = getattr(check, '__name__', '') or ''
-                check_module = getattr(check, '__module__', '') or ''
-                check_str = str(check)
-                
-                # Combine all representations for comprehensive matching
-                combined = f"{check_qualname} {check_name} {check_module} {check_str}".lower()
-                
-                if 'admin' in combined or 'manage_guild' in combined:
-                    return True
-            # Check parent commands
-            if cmd.parent is not None:
-                return has_admin_check(cmd.parent)
-            return False
-        
-        # Get all commands from this cog
-        for cmd in self.walk_commands():
-            # Skip hidden commands
-            if cmd.hidden:
-                continue
-            
-            # Build command signature
-            cmd_name = cmd.qualified_name
-            signature = cmd.signature.strip() if cmd.signature else ""
-            brief = cmd.short_doc or "No description."
-            
-            cmd_str = f"**{cmd_name}**"
-            if signature:
-                cmd_str += f" {signature}"
-            cmd_str += f" - {brief}"
-            
-            # Determine if it's an admin command by checking for admin checks (including parents)
-            is_admin_cmd = has_admin_check(cmd)
-            
-            # Check if user can run this command
-            try:
-                can_run = await cmd.can_run(ctx)
-            except commands.CommandError:
-                can_run = False
-            
-            if is_admin_cmd:
-                # Only add admin commands if user is admin
-                if is_user_admin and can_run:
-                    admin_cmds.append(cmd_str)
-            else:
-                # Add user commands if they can run them
-                if can_run:
-                    user_cmds.append(cmd_str)
-        
-        # Sort commands alphabetically within their categories
-        user_cmds.sort()
-        admin_cmds.sort()
-        
-        # Build pages (max 20 commands per page)
-        pages = []
-        commands_per_page = 20
-        
-        # Create user command pages (always first)
-        if user_cmds:
-            total_user_pages = (len(user_cmds) + commands_per_page - 1) // commands_per_page
-            for page_idx, i in enumerate(range(0, len(user_cmds), commands_per_page)):
-                chunk = user_cmds[i:i + commands_per_page]
-                embed = discord.Embed(
-                    title="🦖 DinoCollector Commands",
-                    color=discord.Color.green()
-                )
-                embed.description = "**━━━ User Commands ━━━**\n\n" + "\n".join(chunk)
-                if total_user_pages > 1:
-                    embed.description += f"\n\n*User Commands Page {page_idx + 1}/{total_user_pages}*"
-                pages.append(embed)
-        
-        # Create admin command pages (only for admins, always after user pages)
-        if is_user_admin and admin_cmds:
-            total_admin_pages = (len(admin_cmds) + commands_per_page - 1) // commands_per_page
-            for page_idx, i in enumerate(range(0, len(admin_cmds), commands_per_page)):
-                chunk = admin_cmds[i:i + commands_per_page]
-                embed = discord.Embed(
-                    title="🔧 DinoCollector Commands",
-                    color=discord.Color.red()
-                )
-                embed.description = "**━━━ Admin Commands ━━━**\n*Requires Admin Role or Manage Server*\n\n" + "\n".join(chunk)
-                if total_admin_pages > 1:
-                    embed.description += f"\n\n*Admin Commands Page {page_idx + 1}/{total_admin_pages}*"
-                pages.append(embed)
-        
-        # Handle empty case
-        if not pages:
-            embed = discord.Embed(
-                title="DinoCollector Commands",
-                description="No commands available.",
-                color=discord.Color.green()
+        # Admin Commands
+        is_admin = await self.bot.is_admin(ctx.author)
+        if is_admin:
+            admin_cmds = (
+                "**dcset adminrole <role>** - Set the admin role.\n"
+                "**dcset spawn** - Force a test spawn.\n"
+                "**dcset channel <add/remove/list>** - Manage spawn channels.\n"
+                "**dcset mode <message/time>** - Set spawn mode.\n"
+                "**dcset chance <0-100>** - Set spawn chance (message mode).\n"
+                "**dcset interval <seconds>** - Set spawn interval (time mode).\n"
+                "**dcset cooldown <seconds>** - Set spawn cooldown.\n"
+                "**dcset shop <upgrade_price/lure_price/lure_cooldown>** - Shop settings.\n"
+                "**dcset filter <add/remove/list>** - Manage disallowed names.\n"
+                "**dcspawn <random/rarity/modifier>** - Force specific spawns."
             )
-            await ctx.send(embed=embed)
-            return
-        
-        # Add overall page numbers to footers
-        total_pages = len(pages)
-        for i, page in enumerate(pages):
-            page.set_footer(text=f"Page {i + 1}/{total_pages}")
-        
-        # If only one page, no need for pagination
-        if total_pages == 1:
-            await ctx.send(embed=pages[0])
-        else:
-            view = PaginationView(pages, ctx.author)
-            msg = await ctx.send(embed=pages[0], view=view)
-            view.message = msg
+            embed.add_field(name="**Admin Commands**", value=admin_cmds, inline=False)
+            
+        await ctx.send(embed=embed)
 
 #-------- Admin Commands --------#
 
