@@ -613,7 +613,7 @@ class DinoCollector(
                 if can_run:
                     user_cmds.append(cmd_str)
         
-        # Sort commands alphabetically
+        # Sort commands alphabetically within their categories
         user_cmds.sort()
         admin_cmds.sort()
         
@@ -621,26 +621,32 @@ class DinoCollector(
         pages = []
         commands_per_page = 20
         
-        # Create user command pages
+        # Create user command pages (always first)
         if user_cmds:
-            for i in range(0, len(user_cmds), commands_per_page):
+            total_user_pages = (len(user_cmds) + commands_per_page - 1) // commands_per_page
+            for page_idx, i in enumerate(range(0, len(user_cmds), commands_per_page)):
                 chunk = user_cmds[i:i + commands_per_page]
                 embed = discord.Embed(
-                    title="DinoCollector Commands - User",
+                    title="🦖 DinoCollector Commands",
                     color=discord.Color.green()
                 )
-                embed.description = "\n".join(chunk)
+                embed.description = "**━━━ User Commands ━━━**\n\n" + "\n".join(chunk)
+                if total_user_pages > 1:
+                    embed.description += f"\n\n*User Commands Page {page_idx + 1}/{total_user_pages}*"
                 pages.append(embed)
         
-        # Create admin command pages (only for admins)
+        # Create admin command pages (only for admins, always after user pages)
         if is_user_admin and admin_cmds:
-            for i in range(0, len(admin_cmds), commands_per_page):
+            total_admin_pages = (len(admin_cmds) + commands_per_page - 1) // commands_per_page
+            for page_idx, i in enumerate(range(0, len(admin_cmds), commands_per_page)):
                 chunk = admin_cmds[i:i + commands_per_page]
                 embed = discord.Embed(
-                    title="DinoCollector Commands - Admin",
+                    title="🔧 DinoCollector Commands",
                     color=discord.Color.red()
                 )
-                embed.description = "\n".join(chunk)
+                embed.description = "**━━━ Admin Commands ━━━**\n*Requires Admin Role or Manage Server*\n\n" + "\n".join(chunk)
+                if total_admin_pages > 1:
+                    embed.description += f"\n\n*Admin Commands Page {page_idx + 1}/{total_admin_pages}*"
                 pages.append(embed)
         
         # Handle empty case
@@ -653,7 +659,7 @@ class DinoCollector(
             await ctx.send(embed=embed)
             return
         
-        # Add page numbers to footers
+        # Add overall page numbers to footers
         total_pages = len(pages)
         for i, page in enumerate(pages):
             page.set_footer(text=f"Page {i + 1}/{total_pages}")
