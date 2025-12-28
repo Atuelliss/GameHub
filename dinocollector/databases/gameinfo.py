@@ -7,17 +7,17 @@ from discord import Embed
 type_modifiers = { "shiny", "corrupted", "sickly", "muscular", "young", "withered"}
 type_normal_mod = {
     "normal": 0,
-    "muscular": 2,
+    "muscular": 5,
     "young": -1,
 }
 type_rare_mod = {    
-    "sickly": -3,    
-    "withered": -2,
-    "irradiated": -1,
+    "sickly": -5,    
+    "withered": -3,
+    "irradiated": -2,
 }
 type_special_mod = {
-    "shiny": 5,
-    "corrupted": 4,
+    "shiny": 15,
+    "corrupted": 5,
     "aberrant": 3,
 }
 modifier_effect_group = [type_normal_mod, type_rare_mod, type_special_mod]
@@ -156,3 +156,4 @@ def select_random_creature(event_mode_enabled=False, event_active_type="", force
     }
     
     return embed, creature_data
+
