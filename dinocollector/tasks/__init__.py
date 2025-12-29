@@ -22,7 +22,7 @@ class TaskLoops(metaclass=CompositeMetaClass):
     def __init__(self, bot):
         super().__init__()
         self.spawn_loop.start()
-        log.info("Spawn loop started")
+        log.debug("Spawn loop started")
 
     async def cog_unload(self):
         self.spawn_loop.cancel()
@@ -47,7 +47,7 @@ class TaskLoops(metaclass=CompositeMetaClass):
                 # log.debug(f"Spawn RNG skipped for {guild.name}")
                 continue
 
-            log.info(f"Attempting spawn for {guild.name}")
+            log.debug(f"Attempting spawn for {guild.name}")
             
             # Time to spawn!
             # Select a channel
