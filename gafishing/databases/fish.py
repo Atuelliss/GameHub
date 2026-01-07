@@ -1,0 +1,348 @@
+# Fish Database for Greenacres Fishing
+# Rarity options: "common", "uncommon", "rare", "epic", "legendary" (fill in later)
+# Seasons: "spring", "summer", "autumn", "winter" or None for all
+# Weather: "sunny", "cloudy", "stormy", "cold", "hot" or None for all
+
+FISH_DATABASE = {
+    # ==================== FRESHWATER FISH ====================
+    "bass_largemouth": {
+        "name": "Largemouth Bass",
+        "water_type": "freshwater",
+        "locations": ["pond", "lake", "river"],
+        "min_weight_oz": 27.6,
+        "max_weight_oz": 276,
+        "max_length_inches": 29,
+        "best_season": "spring",
+        "worst_season": "winter",
+        "best_weather": "cloudy",
+        "preferred_bait": ["rubber_worms", "spinnerbait"],
+        "rarity": "uncommon",
+        "base_fishpoints": 20,
+    },
+    "bass_spotted": {
+        "name": "Spotted Bass",
+        "water_type": "freshwater",
+        "locations": ["pond", "lake", "river"],
+        "min_weight_oz": 13.7,
+        "max_weight_oz": 137,
+        "max_length_inches": 24.5,
+        "best_season": "spring",
+        "worst_season": None,
+        "best_weather": "cloudy",
+        "preferred_bait": ["jerkbait", "spoons"],
+        "rarity": "uncommon",
+        "base_fishpoints": 20,
+    },
+    "bluegill": {
+        "name": "Bluegill",
+        "water_type": "freshwater",
+        "locations": ["pond", "lake"],
+        "min_weight_oz": 7.6,
+        "max_weight_oz": 76,
+        "max_length_inches": 15,
+        "best_season": "summer",
+        "worst_season": "winter",
+        "best_weather": "sunny",
+        "preferred_bait": ["breadballs"],
+        "rarity": "common",
+        "base_fishpoints": 8,
+    },
+    "brown_bullhead_catfish": {
+        "name": "Brown Bullhead Catfish",
+        "water_type": "freshwater",
+        "locations": ["pond", "lake"],
+        "min_weight_oz": 11.8,
+        "max_weight_oz": 118,
+        "max_length_inches": 20,
+        "best_season": "summer",
+        "worst_season": None,
+        "best_weather": None,
+        "preferred_bait": ["any"],
+        "rarity": "common",
+        "base_fishpoints": 8,
+    },
+    "channel_catfish": {
+        "name": "Channel Catfish",
+        "water_type": "freshwater",
+        "locations": ["lake", "river"],
+        "min_weight_oz": 92.8,
+        "max_weight_oz": 928,
+        "max_length_inches": 47.25,
+        "best_season": "summer",
+        "worst_season": "winter",
+        "best_weather": None,
+        "preferred_bait": ["any"],
+        "rarity": "common",
+        "base_fishpoints": 8,
+    },
+    "crappie_black": {
+        "name": "Black Crappie",
+        "water_type": "freshwater",
+        "locations": ["pond", "lake", "river"],
+        "min_weight_oz": 8.0,
+        "max_weight_oz": 80,
+        "max_length_inches": 19.25,
+        "best_season": "spring",
+        "worst_season": None,
+        "best_weather": None,
+        "preferred_bait": ["breadballs"],
+        "rarity": "common",
+        "base_fishpoints": 8,
+    },
+    "yellow_perch": {
+        "name": "Yellow Perch",
+        "water_type": "freshwater",
+        "locations": ["pond", "lake", "river"],
+        "min_weight_oz": 6.7,
+        "max_weight_oz": 67,
+        "max_length_inches": 16,
+        "best_season": "spring",
+        "worst_season": None,
+        "best_weather": None,
+        "preferred_bait": ["breadballs", "rubber_worms"],
+        "rarity": "common",
+        "base_fishpoints": 8,
+    },
+    "chain_pickerel": {
+        "name": "Chain Pickerel",
+        "water_type": "freshwater",
+        "locations": ["pond", "lake", "river"],
+        "min_weight_oz": 15.0,
+        "max_weight_oz": 150,
+        "max_length_inches": 29,
+        "best_season": "spring",
+        "worst_season": None,
+        "best_weather": None,
+        "preferred_bait": ["jerkbait", "spoons"],
+        "rarity": "uncommon",
+        "base_fishpoints": 20,
+    },
+    "spotted_gar": {
+        "name": "Spotted Gar",
+        "water_type": "freshwater",
+        "locations": ["pond", "lake", "river"],
+        "min_weight_oz": 43.6,
+        "max_weight_oz": 436,
+        "max_length_inches": 39,
+        "best_season": "spring",
+        "worst_season": "winter",
+        "best_weather": None,
+        "preferred_bait": ["any"],
+        "rarity": "rare",
+        "base_fishpoints": 50,
+    },
+    "river_trout": {
+        "name": "River Trout",
+        "water_type": "freshwater",
+        "locations": ["lake", "river"],
+        "min_weight_oz": 65.6,
+        "max_weight_oz": 656,
+        "max_length_inches": 43,
+        "best_season": "spring",
+        "worst_season": "summer",
+        "best_weather": "cold",
+        "preferred_bait": ["grubs"],
+        "rarity": "uncommon",
+        "base_fishpoints": 20,
+    },
+    "redear_sunfish": {
+        "name": "Redear Sunfish",
+        "water_type": "freshwater",
+        "locations": ["pond", "lake"],
+        "min_weight_oz": 9.9,
+        "max_weight_oz": 99,
+        "max_length_inches": 17,
+        "best_season": "summer",
+        "worst_season": "winter",
+        "best_weather": "sunny",
+        "preferred_bait": ["grubs"],
+        "rarity": "common",
+        "base_fishpoints": 8,
+    },
+
+    # ==================== FRESH/SALT HYBRID ====================
+    "bass_striped": {
+        "name": "Striped Bass",
+        "water_type": "both",
+        "locations": ["river", "ocean"],
+        "min_weight_oz": 131.0,
+        "max_weight_oz": 1310,
+        "max_length_inches": 54,
+        "best_season": "spring",
+        "worst_season": "winter",
+        "best_weather": None,
+        "preferred_bait": ["rubber_worms", "mullet"],
+        "rarity": "rare",
+        "base_fishpoints": 50,
+    },
+
+    # ==================== SALTWATER FISH ====================
+    "snook": {
+        "name": "Snook",
+        "water_type": "saltwater",
+        "locations": ["river", "ocean"],
+        "min_weight_oz": 85.8,
+        "max_weight_oz": 858,
+        "max_length_inches": 48,
+        "best_season": "summer",
+        "worst_season": "winter",
+        "best_weather": "hot",
+        "preferred_bait": ["shrimp", "mullet"],
+        "rarity": "rare",
+        "base_fishpoints": 50,
+    },
+    "speckled_trout": {
+        "name": "Speckled Trout",
+        "water_type": "saltwater",
+        "locations": ["river", "ocean"],
+        "min_weight_oz": 27.9,
+        "max_weight_oz": 279,
+        "max_length_inches": 34,
+        "best_season": "summer",
+        "worst_season": "winter",
+        "best_weather": None,
+        "preferred_bait": ["shad", "shrimp"],
+        "rarity": "uncommon",
+        "base_fishpoints": 20,
+    },
+    "red_drum": {
+        "name": "Red Drum",
+        "water_type": "saltwater",
+        "locations": ["ocean"],
+        "min_weight_oz": 150.6,
+        "max_weight_oz": 1506,
+        "max_length_inches": 50,
+        "best_season": "autumn",
+        "worst_season": None,
+        "best_weather": None,
+        "preferred_bait": ["shrimp", "mullet"],
+        "rarity": "rare",
+        "base_fishpoints": 50,
+    },
+    "red_grouper": {
+        "name": "Red Grouper",
+        "water_type": "saltwater",
+        "locations": ["ocean"],
+        "min_weight_oz": 67.6,
+        "max_weight_oz": 676,
+        "max_length_inches": 40,
+        "best_season": "spring",
+        "worst_season": None,
+        "best_weather": None,
+        "preferred_bait": ["cut_squid"],
+        "rarity": "rare",
+        "base_fishpoints": 50,
+    },
+    "red_snapper": {
+        "name": "Red Snapper",
+        "water_type": "saltwater",
+        "locations": ["ocean"],
+        "min_weight_oz": 80.4,
+        "max_weight_oz": 804,
+        "max_length_inches": 40,
+        "best_season": "summer",
+        "worst_season": None,
+        "best_weather": None,
+        "preferred_bait": ["cut_squid", "shad"],
+        "rarity": "rare",
+        "base_fishpoints": 50,
+    },
+    "king_mackerel": {
+        "name": "King Mackerel",
+        "water_type": "saltwater",
+        "locations": ["ocean"],
+        "min_weight_oz": 148.8,
+        "max_weight_oz": 1488,
+        "max_length_inches": 62.5,
+        "best_season": "summer",
+        "worst_season": "winter",
+        "best_weather": None,
+        "preferred_bait": ["mullet"],
+        "rarity": "uncommon",
+        "base_fishpoints": 20,
+    },
+    "tarpon": {
+        "name": "Tarpon",
+        "water_type": "saltwater",
+        "locations": ["ocean"],
+        "min_weight_oz": 458.5,
+        "max_weight_oz": 4585,
+        "max_length_inches": 48,
+        "best_season": "summer",
+        "worst_season": "winter",
+        "best_weather": "hot",
+        "preferred_bait": ["mullet"],
+        "rarity": "epic",
+        "base_fishpoints": 120,
+    },
+    "sailfish": {
+        "name": "Sailfish",
+        "water_type": "saltwater",
+        "locations": ["ocean"],
+        "min_weight_oz": 360.5,
+        "max_weight_oz": 3605,
+        "max_length_inches": 134.4,
+        "best_season": "summer",
+        "worst_season": "winter",
+        "best_weather": None,
+        "preferred_bait": ["mullet"],
+        "rarity": "legendary",
+        "base_fishpoints": 300,
+    },
+    "blacktip_shark": {
+        "name": "Black-tip Shark",
+        "water_type": "saltwater",
+        "locations": ["ocean"],
+        "min_weight_oz": 432.0,
+        "max_weight_oz": 4320,
+        "max_length_inches": 110.4,
+        "best_season": "summer",
+        "worst_season": "winter",
+        "best_weather": None,
+        "preferred_bait": ["any"],
+        "rarity": "legendary",
+        "base_fishpoints": 300,
+    },
+}
+
+
+# Helper functions for fish lookups
+def get_fish_by_location(location: str) -> dict:
+    """Returns all fish available at a specific location."""
+    location = location.lower()
+    return {k: v for k, v in FISH_DATABASE.items() if location in v["locations"]}
+
+
+def get_fish_by_water_type(water_type: str) -> dict:
+    """Returns all fish of a specific water type (freshwater, saltwater, both)."""
+    water_type = water_type.lower()
+    if water_type == "freshwater":
+        return {k: v for k, v in FISH_DATABASE.items() if v["water_type"] in ["freshwater", "both"]}
+    elif water_type == "saltwater":
+        return {k: v for k, v in FISH_DATABASE.items() if v["water_type"] in ["saltwater", "both"]}
+    else:
+        return {k: v for k, v in FISH_DATABASE.items() if v["water_type"] == water_type}
+
+
+def get_fish_by_bait(bait: str) -> dict:
+    """Returns all fish that can be caught with a specific bait."""
+    bait = bait.lower()
+    return {k: v for k, v in FISH_DATABASE.items() 
+            if bait in v["preferred_bait"] or "any" in v["preferred_bait"]}
+
+
+def get_fish_by_season(season: str) -> dict:
+    """Returns fish that are good to catch in a specific season (excludes worst_season matches)."""
+    season = season.lower()
+    return {k: v for k, v in FISH_DATABASE.items() 
+            if v["worst_season"] != season}
+
+
+def get_all_bait_types() -> list:
+    """Returns a list of all unique bait types in the database."""
+    baits = set()
+    for fish in FISH_DATABASE.values():
+        for bait in fish["preferred_bait"]:
+            if bait != "any":
+                baits.add(bait)
+    return sorted(list(baits))
