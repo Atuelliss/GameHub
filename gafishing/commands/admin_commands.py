@@ -1104,3 +1104,94 @@ class Admin(MixinMeta):
         
         embed.set_footer(text=f"Total: {len(conf.allowed_channels)} channel(s)")
         await ctx.send(embed=embed)
+    @fishset.command(name="fpset")
+    @commands.check(is_admin)
+    async def set_fishpoints(self, ctx: commands.Context, target: discord.Member, amount: str):
+        """Set a user's FishPoints.
+        
+        **Usage:**
+        • `[p]fishset fpset @user 100` - Set FishPoints to exactly 100
+        • `[p]fishset fpset @user +50` - Add 50 FishPoints
+        • `[p]fishset fpset @user -25` - Subtract 25 FishPoints
+        
+        **Notes:**
+        - Setting to an exact amount updates "most ever" if the new amount is higher
+        - Adding (+) updates both current and "most ever" if new total is higher
+        - Subtracting (-) only reduces current FishPoints, never affects "most ever"
+        - Current FishPoints cannot go below 0
+        """
+        conf = self.db.get_conf(ctx.guild)
+        user_data = conf.get_user(target)
+        
+        old_fp = user_data.total_fishpoints
+        old_most = user_data.most_fishpoints_ever
+        
+        # Parse the amount
+        if amount.startswith('+'):
+            # Add to current amount
+            try:
+                add_amount = int(amount[1:])
+            except ValueError:
+                await ctx.send("❌ Invalid amount. Use a number after the `+` sign.")
+                return
+            
+            user_data.total_fishpoints += add_amount
+            
+            # Update most_fishpoints_ever if new total is higher
+            if user_data.total_fishpoints > user_data.most_fishpoints_ever:
+                user_data.most_fishpoints_ever = user_data.total_fishpoints
+            
+            self.save()
+            
+            await ctx.send(
+                f"✅ Added **{add_amount:,}** FishPoints to {target.mention}\n"
+                f"Current: **{old_fp:,}** → **{user_data.total_fishpoints:,}**\n"
+                f"Most Ever: **{old_most:,}** → **{user_data.most_fishpoints_ever:,}**"
+            )
+            
+        elif amount.startswith('-'):
+            # Subtract from current amount
+            try:
+                sub_amount = int(amount[1:])
+            except ValueError:
+                await ctx.send("❌ Invalid amount. Use a number after the `-` sign.")
+                return
+            
+            user_data.total_fishpoints = max(0, user_data.total_fishpoints - sub_amount)
+            # most_fishpoints_ever stays unchanged
+            
+            self.save()
+            
+            await ctx.send(
+                f"✅ Subtracted **{sub_amount:,}** FishPoints from {target.mention}\n"
+                f"Current: **{old_fp:,}** → **{user_data.total_fishpoints:,}**\n"
+                f"Most Ever: **{user_data.most_fishpoints_ever:,}** (unchanged)"
+            )
+            
+        else:
+            # Set to exact amount
+            try:
+                new_amount = int(amount)
+            except ValueError:
+                await ctx.send("❌ Invalid amount. Use a number, `+number`, or `-number`.")
+                return
+            
+            if new_amount < 0:
+                await ctx.send("❌ FishPoints cannot be negative. Use `0` for zero or `-number` to subtract.")
+                return
+            
+            user_data.total_fishpoints = new_amount
+            
+            # Update most_fishpoints_ever if new amount is higher
+            if new_amount > user_data.most_fishpoints_ever:
+                user_data.most_fishpoints_ever = new_amount
+            
+            self.save()
+            
+            most_changed = " (updated)" if new_amount > old_most else " (unchanged)"
+            
+            await ctx.send(
+                f"✅ Set {target.mention}'s FishPoints to **{new_amount:,}**\n"
+                f"Previous: **{old_fp:,}**\n"
+                f"Most Ever: **{user_data.most_fishpoints_ever:,}**{most_changed}"
+            )
