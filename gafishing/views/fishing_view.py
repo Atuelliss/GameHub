@@ -1012,7 +1012,15 @@ class ActiveFishingView(BaseView):
             
             self._update_buttons()
             embed = await self.create_fishing_embed(interaction.guild)
-            await interaction.response.edit_message(embed=embed, view=self)
+            
+            try:
+                await interaction.response.edit_message(embed=embed, view=self)
+            except (discord.NotFound, discord.HTTPException):
+                # Interaction failed, try direct message edit
+                try:
+                    await self.message.edit(embed=embed, view=self)
+                except (discord.NotFound, discord.HTTPException):
+                    pass
             
             if success:
                 # Start the fight!
@@ -1031,6 +1039,16 @@ class ActiveFishingView(BaseView):
         if self.session.phase not in (FishingPhase.FIGHTING, FishingPhase.TENSION_HIGH):
             return
         
+        # Wait for any user interactions to complete before updating
+        max_wait = 10  # Maximum 1 second wait
+        wait_count = 0
+        while self._processing and wait_count < max_wait:
+            await asyncio.sleep(0.1)
+            wait_count += 1
+        
+        if not self.is_active():
+            return
+        
         # Get next fight event
         phase, msg, should_reel = get_fight_event(self.session)
         
@@ -1042,9 +1060,7 @@ class ActiveFishingView(BaseView):
         embed = await self.create_fishing_embed(interaction.guild)
         try:
             await self.message.edit(embed=embed, view=self)
-        except discord.NotFound:
-            return
-        except discord.HTTPException:
+        except (discord.NotFound, discord.HTTPException):
             return
         
         # If tension high, wait for timeout then process
@@ -1065,6 +1081,16 @@ class ActiveFishingView(BaseView):
         if self.session.phase != FishingPhase.TENSION_HIGH:
             return
         
+        # Wait for any user interactions to complete before updating
+        max_wait = 10  # Maximum 1 second wait
+        wait_count = 0
+        while self._processing and wait_count < max_wait:
+            await asyncio.sleep(0.1)
+            wait_count += 1
+        
+        if not self.is_active():
+            return
+        
         # Player waited correctly
         success, msg, landed = process_reel_attempt(self.session, did_reel=False)
         
@@ -1076,9 +1102,7 @@ class ActiveFishingView(BaseView):
         embed = await self.create_fishing_embed(interaction.guild)
         try:
             await self.message.edit(embed=embed, view=self)
-        except discord.NotFound:
-            return
-        except discord.HTTPException:
+        except (discord.NotFound, discord.HTTPException):
             return
         
         if self.session.phase == FishingPhase.FIGHTING and self.is_active():
@@ -1106,7 +1130,15 @@ class ActiveFishingView(BaseView):
             
             self._update_buttons()
             embed = await self.create_fishing_embed(interaction.guild)
-            await interaction.response.edit_message(embed=embed, view=self)
+            
+            try:
+                await interaction.response.edit_message(embed=embed, view=self)
+            except (discord.NotFound, discord.HTTPException):
+                # Interaction failed, try direct message edit
+                try:
+                    await self.message.edit(embed=embed, view=self)
+                except (discord.NotFound, discord.HTTPException):
+                    pass
             
             # If still fighting (just got a warning), continue sequence
             if self.session.phase in (FishingPhase.FIGHTING, FishingPhase.TENSION_HIGH) and self.is_active():
@@ -1138,7 +1170,15 @@ class ActiveFishingView(BaseView):
             
             self._update_buttons()
             embed = await self.create_fishing_embed(interaction.guild)
-            await interaction.response.edit_message(embed=embed, view=self)
+            
+            try:
+                await interaction.response.edit_message(embed=embed, view=self)
+            except (discord.NotFound, discord.HTTPException):
+                # Interaction failed, try direct message edit
+                try:
+                    await self.message.edit(embed=embed, view=self)
+                except (discord.NotFound, discord.HTTPException):
+                    pass
             
             # If still fighting, continue sequence
             if self.session.phase in (FishingPhase.FIGHTING, FishingPhase.TENSION_HIGH) and self.is_active():
