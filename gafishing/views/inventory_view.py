@@ -460,31 +460,37 @@ class InventoryView(BaseView):
     
     def _add_category_buttons(self):
         """Add the category navigation buttons."""
-        # Row 0: Main category buttons
-        overview_btn = discord.ui.Button(label="Overview", style=discord.ButtonStyle.primary, emoji="🎒", row=0)
+        # Determine which row to start on based on whether we're showing clothing
+        start_row = 3 if self.category == "clothing" else 0
+        
+        # Main category buttons
+        overview_btn = discord.ui.Button(label="Overview", style=discord.ButtonStyle.primary, emoji="🎒", row=start_row)
         overview_btn.callback = self.show_overview
         self.add_item(overview_btn)
         
-        fish_btn = discord.ui.Button(label="Fish", style=discord.ButtonStyle.secondary, emoji="🐟", row=0)
+        fish_btn = discord.ui.Button(label="Fish", style=discord.ButtonStyle.secondary, emoji="🐟", row=start_row)
         fish_btn.callback = self.show_fish
         self.add_item(fish_btn)
         
-        # Row 1: Equipment category buttons
-        rods_btn = discord.ui.Button(label="Rods", style=discord.ButtonStyle.secondary, emoji="🎣", row=1)
+        # Equipment category buttons
+        rods_btn = discord.ui.Button(label="Rods", style=discord.ButtonStyle.secondary, emoji="🎣", row=start_row + 1)
         rods_btn.callback = self.show_rods
         self.add_item(rods_btn)
         
-        lures_btn = discord.ui.Button(label="Lures", style=discord.ButtonStyle.secondary, emoji="🪝", row=1)
+        lures_btn = discord.ui.Button(label="Lures", style=discord.ButtonStyle.secondary, emoji="🪝", row=start_row + 1)
         lures_btn.callback = self.show_lures
         self.add_item(lures_btn)
         
-        clothing_btn = discord.ui.Button(label="Clothing", style=discord.ButtonStyle.secondary, emoji="👕", row=1)
+        clothing_btn = discord.ui.Button(label="Clothing", style=discord.ButtonStyle.secondary, emoji="👕", row=start_row + 1)
         clothing_btn.callback = self.show_clothing
         self.add_item(clothing_btn)
     
     def _add_back_button(self):
         """Add the back button."""
-        back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary, emoji="◀️", row=2)
+        # Back button goes below the equipment buttons
+        start_row = 3 if self.category == "clothing" else 0
+        back_row = start_row + 2  # Two rows after the start (below equipment buttons)
+        back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary, emoji="◀️", row=back_row)
         back_btn.callback = self.back_to_menu
         self.add_item(back_btn)
     
