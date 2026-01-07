@@ -1050,6 +1050,9 @@ class ActiveFishingView(BaseView):
         # If tension high, wait for timeout then process
         if phase == FishingPhase.TENSION_HIGH and self.is_active():
             asyncio.create_task(self._wait_for_tension_release(interaction))
+        elif phase == FishingPhase.FIGHTING and self.is_active():
+            # Continue the fight sequence
+            asyncio.create_task(self._start_fight_sequence(interaction))
     
     async def _wait_for_tension_release(self, interaction: discord.Interaction):
         """Wait during high tension phase."""
