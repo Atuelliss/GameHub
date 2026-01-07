@@ -13,13 +13,8 @@ class User(MixinMeta):
     @commands.command()
     async def dchelp(self, ctx: commands.Context):
         """View the DinoCollector help menu."""
-        embed = discord.Embed(title="Welcome to DinoCollector!", color=discord.Color.green())
-        embed.description = (
-            "This is an Ark-themed collection game. Dinosaurs from ASE and ASA will both spawn in user-set channels with a Capture button. "
-            "Click them fast, as they will flee or others may grab them."
-        )
-        
         view = HelpView(ctx, self)
+        embed = view.get_main_embed()
         view.update_buttons("main")
         msg = await ctx.send(embed=embed, view=view)
         view.message = msg
