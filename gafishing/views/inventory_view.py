@@ -8,14 +8,14 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from ..main import GreenacresFishing
 
-from .base_views import BaseView, BackToMenuMixin, MainMenuView
+from .base_views import BaseView, MainMenuView
 from ..databases.items import RODS_DATABASE, LURES_DATABASE, HATS_DATABASE, COATS_DATABASE, BOOTS_DATABASE
 
 # Combined clothing lookup
 CLOTHING_DATABASE = {**HATS_DATABASE, **COATS_DATABASE, **BOOTS_DATABASE}
 
 
-class InventoryView(BackToMenuMixin, BaseView):
+class InventoryView(BaseView):
     """View for the player's inventory."""
     
     def __init__(
@@ -26,6 +26,12 @@ class InventoryView(BackToMenuMixin, BaseView):
     ):
         super().__init__(cog=cog, author=author)
         self.category = category
+        
+        # Initialize the view with all buttons
+        if self.category == "clothing":
+            self._add_clothing_selects()
+        self._add_category_buttons()
+        self._add_back_button()
     
     async def create_inventory_embed(self) -> discord.Embed:
         """Create the inventory embed based on current category."""
@@ -150,12 +156,18 @@ class InventoryView(BackToMenuMixin, BaseView):
         if not user_data.current_clothing_inventory:
             embed.description = "You don't have any special clothing! Visit the Bait Shop to browse outfits."
         else:
-            clothing_lines = []
+            # Organize by slot
+            hats = []
+            coats = []
+            boots = []
+            
             for idx, item in enumerate(user_data.current_clothing_inventory):
                 item_id = item.get("clothing_id")
                 item_info = CLOTHING_DATABASE.get(item_id, {})
                 name = item_info.get("name", item_id)
                 slot = item.get("slot", item_info.get("slot", "unknown"))
+                luck = item_info.get("luck_bonus", 0)
+                
                 # Check if this item is equipped based on its slot
                 is_equipped = False
                 if slot == "hat" and user_data.equipped_hat_index == idx:
@@ -164,12 +176,51 @@ class InventoryView(BackToMenuMixin, BaseView):
                     is_equipped = True
                 elif slot == "boots" and user_data.equipped_boots_index == idx:
                     is_equipped = True
-                equipped = " ✅ *Equipped*" if is_equipped else ""
-                clothing_lines.append(f"**{name}** ({slot}){equipped}")
+                
+                equipped = " ✅" if is_equipped else ""
+                item_line = f"**{name}**{equipped} (+{luck} luck)"
+                
+                if slot == "hat":
+                    hats.append(item_line)
+                elif slot == "coat":
+                    coats.append(item_line)
+                elif slot == "boots":
+                    boots.append(item_line)
             
-            embed.description = "\n".join(clothing_lines)
+            # Build description
+            desc_parts = []
+            if hats:
+                desc_parts.append("**🎩 Hats**\n" + "\n".join(hats))
+            if coats:
+                desc_parts.append("**🧥 Coats**\n" + "\n".join(coats))
+            if boots:
+                desc_parts.append("**👢 Boots**\n" + "\n".join(boots))
+            
+            embed.description = "\n\n".join(desc_parts) if desc_parts else "No clothing items."
+            
+            # Show total luck bonus
+            hat = user_data.get_equipped_clothing("hat")
+            coat = user_data.get_equipped_clothing("coat")
+            boots_item = user_data.get_equipped_clothing("boots")
+            
+            total_luck = 0
+            if hat:
+                hat_info = CLOTHING_DATABASE.get(hat.get("clothing_id", ""), {})
+                total_luck += hat_info.get("luck_bonus", 0)
+            if coat:
+                coat_info = CLOTHING_DATABASE.get(coat.get("clothing_id", ""), {})
+                total_luck += coat_info.get("luck_bonus", 0)
+            if boots_item:
+                boots_info = CLOTHING_DATABASE.get(boots_item.get("clothing_id", ""), {})
+                total_luck += boots_info.get("luck_bonus", 0)
+            
+            embed.add_field(
+                name="🍀 Total Luck Bonus",
+                value=f"**+{total_luck}** luck from equipped gear",
+                inline=False
+            )
         
-        embed.set_footer(text="Clothing provides special bonuses while fishing!")
+        embed.set_footer(text="Use the dropdowns below to equip/unequip clothing items!")
         return embed
     
     async def _create_fish_embed(self, user_data) -> discord.Embed:
@@ -223,42 +274,255 @@ class InventoryView(BackToMenuMixin, BaseView):
         embed.set_footer(text="Sell your fish at the Bait Shop!")
         return embed
     
-    async def _update_view(self, interaction: discord.Interaction, category: str):
-        """Update the view to show a different category."""
-        self.category = category
+    def _add_clothing_selects(self):
+        """Add dropdown selects for each clothing slot."""
+        conf = self.cog.db.get_conf(self.author.guild)
+        user_data = conf.get_user(self.author)
+        
+        # Group items by slot
+        hats = []
+        coats = []
+        boots = []
+        
+        for idx, item in enumerate(user_data.current_clothing_inventory):
+            item_id = item.get("clothing_id")
+            item_info = CLOTHING_DATABASE.get(item_id, {})
+            slot = item.get("slot", item_info.get("slot", "unknown"))
+            
+            if slot == "hat":
+                hats.append((idx, item, item_info))
+            elif slot == "coat":
+                coats.append((idx, item, item_info))
+            elif slot == "boots":
+                boots.append((idx, item, item_info))
+        
+        # Add hat selector
+        if hats:
+            hat_options = [discord.SelectOption(
+                label="None (Unequip)",
+                value="none",
+                emoji="❌",
+                default=(user_data.equipped_hat_index is None)
+            )]
+            
+            for idx, item, item_info in hats:
+                name = item_info.get("name", "Unknown Hat")
+                luck = item_info.get("luck_bonus", 0)
+                is_equipped = user_data.equipped_hat_index == idx
+                
+                hat_options.append(discord.SelectOption(
+                    label=name[:100],
+                    value=str(idx),
+                    description=f"+{luck} luck",
+                    emoji="✅" if is_equipped else "🎩",
+                    default=is_equipped
+                ))
+            
+            hat_select = discord.ui.Select(
+                placeholder="Select Hat...",
+                options=hat_options,
+                row=0
+            )
+            hat_select.callback = self.hat_selected
+            self.add_item(hat_select)
+        
+        # Add coat selector
+        if coats:
+            coat_options = [discord.SelectOption(
+                label="None (Unequip)",
+                value="none",
+                emoji="❌",
+                default=(user_data.equipped_coat_index is None)
+            )]
+            
+            for idx, item, item_info in coats:
+                name = item_info.get("name", "Unknown Coat")
+                luck = item_info.get("luck_bonus", 0)
+                is_equipped = user_data.equipped_coat_index == idx
+                
+                coat_options.append(discord.SelectOption(
+                    label=name[:100],
+                    value=str(idx),
+                    description=f"+{luck} luck",
+                    emoji="✅" if is_equipped else "🧥",
+                    default=is_equipped
+                ))
+            
+            coat_select = discord.ui.Select(
+                placeholder="Select Coat...",
+                options=coat_options,
+                row=1
+            )
+            coat_select.callback = self.coat_selected
+            self.add_item(coat_select)
+        
+        # Add boots selector
+        if boots:
+            boots_options = [discord.SelectOption(
+                label="None (Unequip)",
+                value="none",
+                emoji="❌",
+                default=(user_data.equipped_boots_index is None)
+            )]
+            
+            for idx, item, item_info in boots:
+                name = item_info.get("name", "Unknown Boots")
+                luck = item_info.get("luck_bonus", 0)
+                is_equipped = user_data.equipped_boots_index == idx
+                
+                boots_options.append(discord.SelectOption(
+                    label=name[:100],
+                    value=str(idx),
+                    description=f"+{luck} luck",
+                    emoji="✅" if is_equipped else "👢",
+                    default=is_equipped
+                ))
+            
+            boots_select = discord.ui.Select(
+                placeholder="Select Boots...",
+                options=boots_options,
+                row=2
+            )
+            boots_select.callback = self.boots_selected
+            self.add_item(boots_select)
+    
+    async def hat_selected(self, interaction: discord.Interaction):
+        """Handle hat selection."""
+        conf = self.cog.db.get_conf(interaction.guild)
+        user_data = conf.get_user(self.author)
+        
+        selected_value = interaction.data["values"][0]
+        
+        if selected_value == "none":
+            user_data.unequip_clothing("hat")
+        else:
+            idx = int(selected_value)
+            user_data.equip_clothing(idx)
+        
+        self.cog.save()
+        
+        # Refresh view
+        self.clear_items()
+        self._add_clothing_selects()
+        self._add_category_buttons()
+        self._add_back_button()
+        
         embed = await self.create_inventory_embed()
         await interaction.response.edit_message(embed=embed, view=self)
     
-    # Row 0: Main category buttons
-    @discord.ui.button(label="Overview", style=discord.ButtonStyle.primary, emoji="🎒", row=0)
-    async def show_overview(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def coat_selected(self, interaction: discord.Interaction):
+        """Handle coat selection."""
+        conf = self.cog.db.get_conf(interaction.guild)
+        user_data = conf.get_user(self.author)
+        
+        selected_value = interaction.data["values"][0]
+        
+        if selected_value == "none":
+            user_data.unequip_clothing("coat")
+        else:
+            idx = int(selected_value)
+            user_data.equip_clothing(idx)
+        
+        self.cog.save()
+        
+        # Refresh view
+        self.clear_items()
+        self._add_clothing_selects()
+        self._add_category_buttons()
+        self._add_back_button()
+        
+        embed = await self.create_inventory_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+    
+    async def boots_selected(self, interaction: discord.Interaction):
+        """Handle boots selection."""
+        conf = self.cog.db.get_conf(interaction.guild)
+        user_data = conf.get_user(self.author)
+        
+        selected_value = interaction.data["values"][0]
+        
+        if selected_value == "none":
+            user_data.unequip_clothing("boots")
+        else:
+            idx = int(selected_value)
+            user_data.equip_clothing(idx)
+        
+        self.cog.save()
+        
+        # Refresh view
+        self.clear_items()
+        self._add_clothing_selects()
+        self._add_category_buttons()
+        self._add_back_button()
+        
+        embed = await self.create_inventory_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+    
+    def _add_category_buttons(self):
+        """Add the category navigation buttons."""
+        # Row 0: Main category buttons
+        overview_btn = discord.ui.Button(label="Overview", style=discord.ButtonStyle.primary, emoji="🎒", row=0)
+        overview_btn.callback = self.show_overview
+        self.add_item(overview_btn)
+        
+        fish_btn = discord.ui.Button(label="Fish", style=discord.ButtonStyle.secondary, emoji="🐟", row=0)
+        fish_btn.callback = self.show_fish
+        self.add_item(fish_btn)
+        
+        # Row 1: Equipment category buttons
+        rods_btn = discord.ui.Button(label="Rods", style=discord.ButtonStyle.secondary, emoji="🎣", row=1)
+        rods_btn.callback = self.show_rods
+        self.add_item(rods_btn)
+        
+        lures_btn = discord.ui.Button(label="Lures", style=discord.ButtonStyle.secondary, emoji="🪝", row=1)
+        lures_btn.callback = self.show_lures
+        self.add_item(lures_btn)
+        
+        clothing_btn = discord.ui.Button(label="Clothing", style=discord.ButtonStyle.secondary, emoji="👕", row=1)
+        clothing_btn.callback = self.show_clothing
+        self.add_item(clothing_btn)
+    
+    def _add_back_button(self):
+        """Add the back button."""
+        back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary, emoji="◀️", row=2)
+        back_btn.callback = self.back_to_menu
+        self.add_item(back_btn)
+    
+    async def _update_view(self, interaction: discord.Interaction, category: str):
+        """Update the view to show a different category."""
+        self.category = category
+        
+        # Rebuild view with proper buttons/selects
+        self.clear_items()
+        if category == "clothing":
+            self._add_clothing_selects()
+        self._add_category_buttons()
+        self._add_back_button()
+        
+        embed = await self.create_inventory_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+    
+    async def show_overview(self, interaction: discord.Interaction, button: discord.ui.Button = None):
         """Show inventory overview."""
         await self._update_view(interaction, "overview")
     
-    @discord.ui.button(label="Fish", style=discord.ButtonStyle.secondary, emoji="🐟", row=0)
-    async def show_fish(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def show_fish(self, interaction: discord.Interaction, button: discord.ui.Button = None):
         """Show caught fish."""
         await self._update_view(interaction, "fish")
     
-    # Row 1: Equipment category buttons
-    @discord.ui.button(label="Rods", style=discord.ButtonStyle.secondary, emoji="🎣", row=1)
-    async def show_rods(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def show_rods(self, interaction: discord.Interaction, button: discord.ui.Button = None):
         """Show rods inventory."""
         await self._update_view(interaction, "rods")
     
-    @discord.ui.button(label="Lures", style=discord.ButtonStyle.secondary, emoji="🪝", row=1)
-    async def show_lures(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def show_lures(self, interaction: discord.Interaction, button: discord.ui.Button = None):
         """Show lures/bait inventory."""
         await self._update_view(interaction, "lures")
     
-    @discord.ui.button(label="Clothing", style=discord.ButtonStyle.secondary, emoji="👕", row=1)
-    async def show_clothing(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def show_clothing(self, interaction: discord.Interaction, button: discord.ui.Button = None):
         """Show clothing inventory."""
         await self._update_view(interaction, "clothing")
     
-    # Row 2: Override back button from mixin to use row 2
-    @discord.ui.button(label="Back", style=discord.ButtonStyle.secondary, emoji="◀️", row=2)
-    async def back_to_menu(self, interaction: discord.Interaction, button: discord.ui.Button):
+    async def back_to_menu(self, interaction: discord.Interaction, button: discord.ui.Button = None):
         """Return to the main menu."""
         from .main_menu import create_main_menu_embed
         
