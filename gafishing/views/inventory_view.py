@@ -30,8 +30,8 @@ class InventoryView(BaseView):
         # Initialize the view with all buttons
         if self.category == "clothing":
             self._add_clothing_selects()
-        self._add_category_buttons()
         self._add_back_button()
+        self._add_category_buttons()
     
     async def create_inventory_embed(self) -> discord.Embed:
         """Create the inventory embed based on current category."""
@@ -452,8 +452,8 @@ class InventoryView(BaseView):
         # Refresh view
         self.clear_items()
         self._add_clothing_selects()
-        self._add_category_buttons()
         self._add_back_button()
+        self._add_category_buttons()
         
         embed = await self.create_inventory_embed()
         await interaction.response.edit_message(embed=embed, view=self)
@@ -487,10 +487,9 @@ class InventoryView(BaseView):
     
     def _add_back_button(self):
         """Add the back button."""
-        # Back button goes below the equipment buttons
+        # Back button goes on same row as Overview/Fish, but is added last so it appears on the right
         start_row = 3 if self.category == "clothing" else 0
-        back_row = start_row + 2  # Two rows after the start (below equipment buttons)
-        back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary, emoji="◀️", row=back_row)
+        back_btn = discord.ui.Button(label="Back", style=discord.ButtonStyle.secondary, emoji="◀️", row=start_row)
         back_btn.callback = self.back_to_menu
         self.add_item(back_btn)
     
@@ -502,8 +501,8 @@ class InventoryView(BaseView):
         self.clear_items()
         if category == "clothing":
             self._add_clothing_selects()
-        self._add_category_buttons()
         self._add_back_button()
+        self._add_category_buttons()
         
         embed = await self.create_inventory_embed()
         await interaction.response.edit_message(embed=embed, view=self)
