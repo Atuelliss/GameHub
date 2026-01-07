@@ -1039,6 +1039,11 @@ class ActiveFishingView(BaseView):
         if self.session.phase not in (FishingPhase.FIGHTING, FishingPhase.TENSION_HIGH):
             return
         
+        # Check if fish is very close - stop auto-events and let player finish reeling
+        if self.session.line_distance <= 10:
+            # Fish is close enough - no more auto-events, just let player reel in
+            return
+        
         # Wait for any user interactions to complete before updating
         max_wait = 10  # Maximum 1 second wait
         wait_count = 0
