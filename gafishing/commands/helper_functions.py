@@ -608,7 +608,8 @@ def get_eligible_fish(
     
     for fish_id, fish_data in FISH_DATABASE.items():
         # Check water type match
-        if fish_data.get("water_type") != water_type:
+        fish_water_type = fish_data.get("water_type")
+        if fish_water_type not in [water_type, "both"]:
             continue
         
         # Check location match
