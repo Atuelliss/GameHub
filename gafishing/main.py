@@ -29,6 +29,9 @@ class GreenacresFishing(
 
         # States
         self._saving = False
+        
+        # Track active views so we can close them on reload
+        self.active_views = set()
 
     def format_help_for_context(self, ctx: commands.Context):
         helpcmd = super().format_help_for_context(ctx)
@@ -43,6 +46,17 @@ class GreenacresFishing(
 
     async def cog_load(self) -> None:
         asyncio.create_task(self.initialize())
+    
+    def cog_unload(self) -> None:
+        """Stop all active views when cog is unloaded/reloaded."""
+        log.info(f"Stopping {len(self.active_views)} active views...")
+        for view in list(self.active_views):
+            try:
+                view.stop()
+            except Exception as e:
+                log.error(f"Error stopping view: {e}")
+        self.active_views.clear()
+        log.info("All active views stopped")
 
     async def initialize(self) -> None:
         await self.bot.wait_until_red_ready()
