@@ -634,7 +634,7 @@ def get_eligible_fish(
         if best_season and best_season.lower() == season_lower:
             weight *= 2.0  # Double chance in best season
         elif worst_season and worst_season.lower() == season_lower:
-            weight *= 0.25  # Quarter chance in worst season
+            weight *= 0.15  # 15% chance in worst season
         
         # Weather modifier
         best_weather = fish_data.get("best_weather")
@@ -648,7 +648,7 @@ def get_eligible_fish(
         if "any" in preferred_bait or bait_id in preferred_bait:
             weight *= 2.0  # Double chance with right bait
         else:
-            weight *= 0.5  # Half chance with wrong bait
+            weight *= 0.25  # 25% chance with wrong bait
         
         if weight > 0:
             eligible.append((fish_id, fish_data, weight))
