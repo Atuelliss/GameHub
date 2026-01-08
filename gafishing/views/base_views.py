@@ -33,6 +33,18 @@ class BaseView(discord.ui.View):
         self.message: Optional[discord.Message] = None
         self._timeout_duration = timeout  # Store original timeout for reset
         self._is_stopped = False  # Track if view has been stopped/timed out
+        
+        # Register this view with the cog for tracking
+        if hasattr(cog, 'active_views'):
+            cog.active_views.add(self)
+        
+        # Register this view with the cog for tracking
+        if hasattr(cog, 'active_views'):
+            cog.active_views.add(self)
+        
+        # Register this view with the cog
+        if hasattr(cog, 'active_views'):
+            cog.active_views.add(self)
     
     def is_active(self) -> bool:
         """Check if the view is still active (not stopped or timed out)."""
@@ -41,6 +53,11 @@ class BaseView(discord.ui.View):
     def stop(self) -> None:
         """Stop the view and mark it as stopped."""
         self._is_stopped = True
+        
+        # Unregister this view from the cog
+        if hasattr(self.cog, 'active_views'):
+            self.cog.active_views.discard(self)
+        
         super().stop()
     
     def _reset_timeout(self) -> None:
@@ -82,6 +99,10 @@ class BaseView(discord.ui.View):
     async def on_timeout(self) -> None:
         """Disable all buttons when the view times out."""
         self._is_stopped = True
+        
+        # Unregister from active views
+        if hasattr(self.cog, 'active_views'):
+            self.cog.active_views.discard(self)
         
         for item in self.children:
             if isinstance(item, discord.ui.Button):
