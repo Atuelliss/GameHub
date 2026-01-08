@@ -778,13 +778,31 @@ def generate_fish_size(fish_data: Dict[str, Any], luck_bonus: int = 0) -> tuple:
     return (round(weight, 1), round(length, 1), False)
 
 
-def calculate_cast_distance() -> int:
+def calculate_cast_distance(location: str = "pond") -> int:
     """
     Calculate a random cast distance in feet (increments of 5).
-    Range: 15-50 feet.
+    Base range: 15-50 feet.
+    Ocean/River: +20-45 feet (35-95 feet total).
+    
+    Parameters
+    ----------
+    location : str
+        The fishing location (pond, lake, river, ocean).
+    
+    Returns
+    -------
+    int
+        Cast distance in feet.
     """
-    # Random distance from 15 to 50 feet in 5-foot increments
-    return random.choice([15, 20, 25, 30, 35, 40, 45, 50])
+    # Base distance from 15 to 50 feet in 5-foot increments
+    base_distance = random.choice([15, 20, 25, 30, 35, 40, 45, 50])
+    
+    # Add extra distance for ocean and river locations
+    if location.lower() in ["ocean", "river"]:
+        extra_distance = random.choice([20, 25, 30, 35, 40, 45])
+        return base_distance + extra_distance
+    
+    return base_distance
 
 
 def check_fish_interest(
@@ -867,7 +885,7 @@ def cast_line(session: FishingSession) -> str:
     str
         A message describing the cast.
     """
-    distance = calculate_cast_distance()
+    distance = calculate_cast_distance(session.location)
     session.line_distance = distance
     session.max_distance = distance
     session.phase = FishingPhase.WAITING
@@ -1271,7 +1289,7 @@ def land_the_fish(session: FishingSession, user_data) -> tuple:
     return (msg, is_record, earned_token)
 
 
-def handle_line_snap(session: FishingSession, user_data) -> str:
+def handle_line_snap(session: FishingSession, user_data) -> tuple:
     """
     Handle when the line snaps (too many botched attempts).
     
@@ -1284,8 +1302,8 @@ def handle_line_snap(session: FishingSession, user_data) -> str:
     
     Returns
     -------
-    str
-        Message describing what happened.
+    tuple
+        (str message, bool rod_broke) - message describing what happened and whether rod broke.
     """
     fish_name = session.fish_data.get("name", "fish") if session.fish_data else "fish"
     
@@ -1296,9 +1314,17 @@ def handle_line_snap(session: FishingSession, user_data) -> str:
     damage_reduction = luck_bonus * 0.5
     rod_damage = max(2, int(base_damage - damage_reduction))
     
+    rod_broke = False
     equipped_rod = user_data.get_equipped_rod()
     if equipped_rod:
-        equipped_rod["durability"] = max(0, equipped_rod.get("durability", 0) - rod_damage)
+        old_durability = equipped_rod.get("durability", 0)
+        equipped_rod["durability"] = max(0, old_durability - rod_damage)
+        
+        # Check if rod broke
+        if equipped_rod["durability"] <= 0 and old_durability > 0:
+            rod_broke = True
+            # Auto-unequip the broken rod
+            user_data.equipped_rod_index = None
     
     # Lose the lure - line snap loses entire bait item (all its uses)
     equipped_lure = user_data.get_equipped_lure()
@@ -1322,7 +1348,13 @@ def handle_line_snap(session: FishingSession, user_data) -> str:
     user_data.total_fishing_attempts += 1
     
     session.phase = FishingPhase.ESCAPED
-    msg = f"*The {fish_name} got away! Your line snapped and you lost your lure. Your rod took some wear.*"
+    
+    # Build message based on whether rod broke
+    if rod_broke:
+        msg = f"💥 *The {fish_name} got away! Your line snapped and you lost your lure. Your rod has BROKEN and been removed from your equipment!*"
+    else:
+        msg = f"*The {fish_name} got away! Your line snapped and you lost your lure. Your rod took some wear.*"
+    
     session.add_message(msg)
     
-    return msg
+    return (msg, rod_broke)
