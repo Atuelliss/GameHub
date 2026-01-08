@@ -1138,6 +1138,7 @@ class ActiveFishingView(BaseView):
         
         # Check if view is still active
         if not self.is_active():
+            self.session.add_message("DEBUG: Fight stopped - view not active")
             return
         
         # Check if user has been inactive too long
@@ -1152,8 +1153,9 @@ class ActiveFishingView(BaseView):
             return
         
         # Check if fish is very close - stop auto-events and let player finish reeling
-        if self.session.line_distance <= 10:
-            # Fish is close enough - no more auto-events, just let player reel in
+        # Only stop when fish is at 0 feet (about to be landed)
+        if self.session.line_distance <= 0:
+            # Fish is landed - no more auto-events
             return
         
         # Wait for any user interactions to complete before updating
@@ -1188,10 +1190,7 @@ class ActiveFishingView(BaseView):
             
             self._tension_task = asyncio.create_task(self._wait_for_tension_release(interaction))
         elif phase == FishingPhase.FIGHTING and self.is_active():
-            # Continue the fight sequence - cancel old task and start new one
-            if self._fight_task and not self._fight_task.done():
-                self._fight_task.cancel()
-            
+            # Continue the fight sequence - just create new task, don't cancel current one
             self._fight_task = asyncio.create_task(self._start_fight_sequence(interaction))
     
     async def _wait_for_tension_release(self, interaction: discord.Interaction):
@@ -1238,10 +1237,7 @@ class ActiveFishingView(BaseView):
             return
         
         if self.session.phase == FishingPhase.FIGHTING and self.is_active():
-            # Continue fight - cancel old task and start new one
-            if self._fight_task and not self._fight_task.done():
-                self._fight_task.cancel()
-            
+            # Continue fight - just create new task, don't cancel current one
             self._fight_task = asyncio.create_task(self._start_fight_sequence(interaction))
     
     async def _on_reel_during_tension(self, interaction: discord.Interaction):
