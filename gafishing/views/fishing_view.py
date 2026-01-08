@@ -1067,6 +1067,14 @@ class ActiveFishingView(BaseView):
                 
                 self._waiting_for_strike = True
                 self._hook_task = asyncio.create_task(self._wait_for_hook_set(interaction))
+            elif self.session.phase == FishingPhase.WAITING and self.is_active():
+                # Fish swam away - restart waiting for bite
+                # Cancel any existing bite task before starting a new one
+                if self._bite_task and not self._bite_task.done():
+                    self._bite_task.cancel()
+                
+                self._waiting_for_bite = True
+                self._bite_task = asyncio.create_task(self._wait_for_bite(interaction))
         finally:
             self._processing = False
     
