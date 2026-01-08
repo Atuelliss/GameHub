@@ -1281,8 +1281,12 @@ class ActiveFishingView(BaseView):
             
             if self.session.phase == FishingPhase.ESCAPED:
                 # Line snapped from the mistake
-                handle_line_snap(self.session, user_data)
+                snap_msg, rod_broke = handle_line_snap(self.session, user_data)
                 self.cog.save()
+                
+                # If rod broke, disable all buttons and stop fishing
+                if rod_broke:
+                    self._disable_all_buttons()
             
             self._update_buttons()
             embed = await self.create_fishing_embed(interaction.guild)
@@ -1331,8 +1335,12 @@ class ActiveFishingView(BaseView):
                 self.cog.save()
             elif self.session.phase == FishingPhase.ESCAPED:
                 # Line snapped
-                handle_line_snap(self.session, user_data)
+                snap_msg, rod_broke = handle_line_snap(self.session, user_data)
                 self.cog.save()
+                
+                # If rod broke, disable all buttons and stop fishing
+                if rod_broke:
+                    self._disable_all_buttons()
             
             self._update_buttons()
             embed = await self.create_fishing_embed(interaction.guild)
