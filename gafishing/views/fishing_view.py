@@ -4,6 +4,7 @@ Fishing view - Where the actual fishing happens.
 
 import asyncio
 import discord
+import time
 from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
@@ -619,6 +620,16 @@ class ActiveFishingView(BaseView):
         # Click spam prevention - only one action at a time
         self._processing = False
         
+        # Track last user interaction to prevent auto-updates from keeping view alive forever
+        self._last_user_interaction: float = time.time()
+        self._user_timeout_seconds: float = 120.0  # 2 minutes of no user clicks = timeout
+        
+        # Task tracking for proper cancellation
+        self._bite_task: Optional[asyncio.Task] = None
+        self._hook_task: Optional[asyncio.Task] = None
+        self._fight_task: Optional[asyncio.Task] = None
+        self._tension_task: Optional[asyncio.Task] = None
+        
         # Initialize buttons
         self._update_buttons()
     
@@ -635,6 +646,33 @@ class ActiveFishingView(BaseView):
                 pass
             return True
         return False
+    
+    def _cancel_all_tasks(self):
+        """Cancel all running async tasks to prevent them from continuing after view closes."""
+        tasks_to_cancel = [
+            self._bite_task,
+            self._hook_task,
+            self._fight_task,
+            self._tension_task
+        ]
+        
+        for task in tasks_to_cancel:
+            if task and not task.done():
+                task.cancel()
+        
+        # Clear references
+        self._bite_task = None
+        self._hook_task = None
+        self._fight_task = None
+        self._tension_task = None
+    
+    def _should_timeout_from_inactivity(self) -> bool:
+        """Check if user has been inactive for too long."""
+        return (time.time() - self._last_user_interaction) > self._user_timeout_seconds
+    
+    def _update_user_interaction(self):
+        """Update timestamp when user clicks a button."""
+        self._last_user_interaction = time.time()
     
     async def create_fishing_embed(self, guild: discord.Guild) -> discord.Embed:
         """Create the active fishing embed."""
@@ -815,44 +853,59 @@ class ActiveFishingView(BaseView):
     
     async def _on_cast_line(self, interaction: discord.Interaction):
         """Handle Cast Line button."""
-        # Check bait before casting
-        conf = self.cog.db.get_conf(interaction.guild)
-        user_data = conf.get_user(self.author)
+        # Prevent click spam
+        if await self._check_processing(interaction):
+            return
+        self._processing = True
         
-        equipped_lure = user_data.get_equipped_lure()
-        if not equipped_lure or equipped_lure.get("quantity", 0) <= 0:
-            # No bait! Unequip and send back to location
-            user_data.equipped_lure_index = None
+        # Track user interaction
+        self._update_user_interaction()
+        
+        try:
+            # Check bait before casting
+            conf = self.cog.db.get_conf(interaction.guild)
+            user_data = conf.get_user(self.author)
+            
+            equipped_lure = user_data.get_equipped_lure()
+            if not equipped_lure or equipped_lure.get("quantity", 0) <= 0:
+                # No bait! Unequip and send back to location
+                user_data.equipped_lure_index = None
+                self.cog.save()
+                
+                await interaction.response.send_message(
+                    "❌ You're out of bait! Visit the Bait Shop to buy more.",
+                    ephemeral=True
+                )
+                
+                # Return to location view
+                self.stop()
+                new_view = FishingView(cog=self.cog, author=self.author, location=self.location)
+                embed = await new_view.create_fishing_embed(interaction.guild)
+                new_view.message = self.message
+                await self.message.edit(embed=embed, view=new_view)
+                return
+            
+            # Increment fishing attempts counter
+            user_data.total_fishing_attempts += 1
             self.cog.save()
             
-            await interaction.response.send_message(
-                "❌ You're out of bait! Visit the Bait Shop to buy more.",
-                ephemeral=True
-            )
+            # Cast the line
+            cast_line(self.session)
             
-            # Return to location view
-            self.stop()
-            new_view = FishingView(cog=self.cog, author=self.author, location=self.location)
-            embed = await new_view.create_fishing_embed(interaction.guild)
-            new_view.message = self.message
-            await self.message.edit(embed=embed, view=new_view)
-            return
-        
-        # Increment fishing attempts counter
-        user_data.total_fishing_attempts += 1
-        self.cog.save()
-        
-        # Cast the line
-        cast_line(self.session)
-        
-        # Update view
-        self._update_buttons()
-        embed = await self.create_fishing_embed(interaction.guild)
-        await interaction.response.edit_message(embed=embed, view=self)
-        
-        # Start waiting for bite (10 second delay)
-        self._waiting_for_bite = True
-        asyncio.create_task(self._wait_for_bite(interaction))
+            # Update view
+            self._update_buttons()
+            embed = await self.create_fishing_embed(interaction.guild)
+            await interaction.response.edit_message(embed=embed, view=self)
+            
+            # Start waiting for bite (10 second delay)
+            # Cancel any existing bite task first
+            if self._bite_task and not self._bite_task.done():
+                self._bite_task.cancel()
+            
+            self._waiting_for_bite = True
+            self._bite_task = asyncio.create_task(self._wait_for_bite(interaction))
+        finally:
+            self._processing = False
     
     async def _wait_for_bite(self, interaction: discord.Interaction):
         """Wait for a fish to show interest."""
@@ -907,63 +960,98 @@ class ActiveFishingView(BaseView):
         
         # If nothing biting, automatically wait and check again
         if not interested and self.session.phase == FishingPhase.WAITING and self.is_active():
+            # Cancel any existing bite task before starting a new one
+            if self._bite_task and not self._bite_task.done():
+                self._bite_task.cancel()
+            
             self._waiting_for_bite = True
-            asyncio.create_task(self._wait_for_bite(interaction))
+            self._bite_task = asyncio.create_task(self._wait_for_bite(interaction))
     
     async def _on_retrieve(self, interaction: discord.Interaction):
         """Handle Retrieve button (no fish following)."""
-        retrieve_line(self.session)
+        # Prevent click spam
+        if await self._check_processing(interaction):
+            return
+        self._processing = True
         
-        if self.session.line_distance <= 0:
-            # Line fully retrieved, back to idle
-            self.session.phase = FishingPhase.IDLE
+        # Track user interaction
+        self._update_user_interaction()
         
-        self._update_buttons()
-        embed = await self.create_fishing_embed(interaction.guild)
-        await interaction.response.edit_message(embed=embed, view=self)
-        
-        # If still waiting phase, restart the timer
-        if self.session.phase in (FishingPhase.WAITING, FishingPhase.RETRIEVING):
-            self.session.phase = FishingPhase.WAITING
-            self._waiting_for_bite = True
-            asyncio.create_task(self._wait_for_bite(interaction))
+        try:
+            retrieve_line(self.session)
+            
+            if self.session.line_distance <= 0:
+                # Line fully retrieved, back to idle
+                self.session.phase = FishingPhase.IDLE
+            
+            self._update_buttons()
+            embed = await self.create_fishing_embed(interaction.guild)
+            await interaction.response.edit_message(embed=embed, view=self)
+            
+            # If still waiting phase, restart the timer
+            if self.session.phase in (FishingPhase.WAITING, FishingPhase.RETRIEVING):
+                self.session.phase = FishingPhase.WAITING
+                
+                # Cancel any existing bite task before starting a new one
+                if self._bite_task and not self._bite_task.done():
+                    self._bite_task.cancel()
+                
+                self._waiting_for_bite = True
+                self._bite_task = asyncio.create_task(self._wait_for_bite(interaction))
+        finally:
+            self._processing = False
     
     async def _on_retrieve_with_fish(self, interaction: discord.Interaction):
         """Handle Retrieve button when fish is following."""
-        retrieve_line(self.session)
+        # Prevent click spam
+        if await self._check_processing(interaction):
+            return
+        self._processing = True
         
-        # Get game conditions for fish strike
-        conf = self.cog.db.get_conf(interaction.guild)
-        user_data = conf.get_user(self.author)
-        calendar = get_game_calendar(self.cog.db, interaction.guild)
-        time_of_day = get_game_time_of_day(self.cog.db, interaction.guild)
-        weather = get_weather_for_guild(
-            self.cog.db,
-            interaction.guild,
-            calendar['season'],
-            time_of_day['name'],
-            calendar['total_game_days']
-        )
+        # Track user interaction
+        self._update_user_interaction()
         
-        equipped_lure = user_data.get_equipped_lure()
-        bait_id = equipped_lure.get("lure_id", "") if equipped_lure else ""
-        
-        # Check if fish strikes (50/50)
-        fish_id, fish_data, msg = fish_strikes(
-            self.session,
-            calendar['season'],
-            weather['type'].value if hasattr(weather['type'], 'value') else str(weather['type']),
-            bait_id
-        )
-        
-        self._update_buttons()
-        embed = await self.create_fishing_embed(interaction.guild)
-        await interaction.response.edit_message(embed=embed, view=self)
-        
-        # If fish struck, start the hook timeout
-        if fish_id and self.is_active():
-            self._waiting_for_strike = True
-            asyncio.create_task(self._wait_for_hook_set(interaction))
+        try:
+            retrieve_line(self.session)
+            
+            # Get game conditions for fish strike
+            conf = self.cog.db.get_conf(interaction.guild)
+            user_data = conf.get_user(self.author)
+            calendar = get_game_calendar(self.cog.db, interaction.guild)
+            time_of_day = get_game_time_of_day(self.cog.db, interaction.guild)
+            weather = get_weather_for_guild(
+                self.cog.db,
+                interaction.guild,
+                calendar['season'],
+                time_of_day['name'],
+                calendar['total_game_days']
+            )
+            
+            equipped_lure = user_data.get_equipped_lure()
+            bait_id = equipped_lure.get("lure_id", "") if equipped_lure else ""
+            
+            # Check if fish strikes (50/50)
+            fish_id, fish_data, msg = fish_strikes(
+                self.session,
+                calendar['season'],
+                weather['type'].value if hasattr(weather['type'], 'value') else str(weather['type']),
+                bait_id
+            )
+            
+            self._update_buttons()
+            embed = await self.create_fishing_embed(interaction.guild)
+            await interaction.response.edit_message(embed=embed, view=self)
+            
+            # If fish struck, start the hook timeout
+            if fish_id and self.is_active():
+                # Cancel any existing hook task before starting a new one
+                if self._hook_task and not self._hook_task.done():
+                    self._hook_task.cancel()
+                
+                self._waiting_for_strike = True
+                self._hook_task = asyncio.create_task(self._wait_for_hook_set(interaction))
+        finally:
+            self._processing = False
     
     async def _wait_for_hook_set(self, interaction: discord.Interaction):
         """Wait for player to set hook (5 second timeout)."""
@@ -1005,26 +1093,42 @@ class ActiveFishingView(BaseView):
             return
         self._processing = True
         
+        # Track user interaction
+        self._update_user_interaction()
+        
         try:
             self._waiting_for_strike = False
+            
+            # Cancel hook timeout task if it's running
+            if self._hook_task and not self._hook_task.done():
+                self._hook_task.cancel()
+                self._hook_task = None
             
             success, msg = attempt_set_hook(self.session)
             
             self._update_buttons()
             embed = await self.create_fishing_embed(interaction.guild)
             
+            message_updated = False
             try:
                 await interaction.response.edit_message(embed=embed, view=self)
+                message_updated = True
             except (discord.NotFound, discord.HTTPException):
                 # Interaction failed, try direct message edit
                 try:
                     await self.message.edit(embed=embed, view=self)
+                    message_updated = True
                 except (discord.NotFound, discord.HTTPException):
                     pass
             
-            if success:
+            # Only start fight sequence if message was updated successfully and hook was set
+            if success and message_updated:
+                # Cancel any existing fight task before starting a new one
+                if self._fight_task and not self._fight_task.done():
+                    self._fight_task.cancel()
+                
                 # Start the fight!
-                asyncio.create_task(self._start_fight_sequence(interaction))
+                self._fight_task = asyncio.create_task(self._start_fight_sequence(interaction))
         finally:
             self._processing = False
     
@@ -1034,6 +1138,14 @@ class ActiveFishingView(BaseView):
         
         # Check if view is still active
         if not self.is_active():
+            return
+        
+        # Check if user has been inactive too long
+        if self._should_timeout_from_inactivity():
+            self.session.add_message("*You've been idle too long. The fish escapes!*")
+            self.session.phase = FishingPhase.ESCAPED
+            self._cancel_all_tasks()
+            self.stop()
             return
         
         if self.session.phase not in (FishingPhase.FIGHTING, FishingPhase.TENSION_HIGH):
@@ -1070,10 +1182,17 @@ class ActiveFishingView(BaseView):
         
         # If tension high, wait for timeout then process
         if phase == FishingPhase.TENSION_HIGH and self.is_active():
-            asyncio.create_task(self._wait_for_tension_release(interaction))
+            # Cancel any existing tension task before starting a new one
+            if self._tension_task and not self._tension_task.done():
+                self._tension_task.cancel()
+            
+            self._tension_task = asyncio.create_task(self._wait_for_tension_release(interaction))
         elif phase == FishingPhase.FIGHTING and self.is_active():
-            # Continue the fight sequence
-            asyncio.create_task(self._start_fight_sequence(interaction))
+            # Continue the fight sequence - cancel old task and start new one
+            if self._fight_task and not self._fight_task.done():
+                self._fight_task.cancel()
+            
+            self._fight_task = asyncio.create_task(self._start_fight_sequence(interaction))
     
     async def _wait_for_tension_release(self, interaction: discord.Interaction):
         """Wait during high tension phase."""
@@ -1081,6 +1200,14 @@ class ActiveFishingView(BaseView):
         
         # Check if view is still active
         if not self.is_active():
+            return
+        
+        # Check if user has been inactive too long
+        if self._should_timeout_from_inactivity():
+            self.session.add_message("*You've been idle too long. The fish escapes!*")
+            self.session.phase = FishingPhase.ESCAPED
+            self._cancel_all_tasks()
+            self.stop()
             return
         
         if self.session.phase != FishingPhase.TENSION_HIGH:
@@ -1111,8 +1238,11 @@ class ActiveFishingView(BaseView):
             return
         
         if self.session.phase == FishingPhase.FIGHTING and self.is_active():
-            # Continue fight
-            asyncio.create_task(self._start_fight_sequence(interaction))
+            # Continue fight - cancel old task and start new one
+            if self._fight_task and not self._fight_task.done():
+                self._fight_task.cancel()
+            
+            self._fight_task = asyncio.create_task(self._start_fight_sequence(interaction))
     
     async def _on_reel_during_tension(self, interaction: discord.Interaction):
         """Handle Reel In button during high tension - this is a MISTAKE!"""
@@ -1121,7 +1251,15 @@ class ActiveFishingView(BaseView):
             return
         self._processing = True
         
+        # Track user interaction
+        self._update_user_interaction()
+        
         try:
+            # Cancel tension task if player clicked during it
+            if self._tension_task and not self._tension_task.done():
+                self._tension_task.cancel()
+                self._tension_task = None
+            
             conf = self.cog.db.get_conf(interaction.guild)
             user_data = conf.get_user(self.author)
             
@@ -1136,18 +1274,25 @@ class ActiveFishingView(BaseView):
             self._update_buttons()
             embed = await self.create_fishing_embed(interaction.guild)
             
+            message_updated = False
             try:
                 await interaction.response.edit_message(embed=embed, view=self)
+                message_updated = True
             except (discord.NotFound, discord.HTTPException):
                 # Interaction failed, try direct message edit
                 try:
                     await self.message.edit(embed=embed, view=self)
+                    message_updated = True
                 except (discord.NotFound, discord.HTTPException):
                     pass
             
-            # If still fighting (just got a warning), continue sequence
-            if self.session.phase in (FishingPhase.FIGHTING, FishingPhase.TENSION_HIGH) and self.is_active():
-                asyncio.create_task(self._start_fight_sequence(interaction))
+            # If still fighting (just got a warning), continue sequence - only if message updated
+            if message_updated and self.session.phase in (FishingPhase.FIGHTING, FishingPhase.TENSION_HIGH) and self.is_active():
+                # Cancel old fight task and start new one
+                if self._fight_task and not self._fight_task.done():
+                    self._fight_task.cancel()
+                
+                self._fight_task = asyncio.create_task(self._start_fight_sequence(interaction))
         finally:
             self._processing = False
     
@@ -1157,6 +1302,9 @@ class ActiveFishingView(BaseView):
         if await self._check_processing(interaction):
             return
         self._processing = True
+        
+        # Track user interaction
+        self._update_user_interaction()
         
         try:
             conf = self.cog.db.get_conf(interaction.guild)
@@ -1176,18 +1324,25 @@ class ActiveFishingView(BaseView):
             self._update_buttons()
             embed = await self.create_fishing_embed(interaction.guild)
             
+            message_updated = False
             try:
                 await interaction.response.edit_message(embed=embed, view=self)
+                message_updated = True
             except (discord.NotFound, discord.HTTPException):
                 # Interaction failed, try direct message edit
                 try:
                     await self.message.edit(embed=embed, view=self)
+                    message_updated = True
                 except (discord.NotFound, discord.HTTPException):
                     pass
             
-            # If still fighting, continue sequence
-            if self.session.phase in (FishingPhase.FIGHTING, FishingPhase.TENSION_HIGH) and self.is_active():
-                asyncio.create_task(self._start_fight_sequence(interaction))
+            # If still fighting, continue sequence - only if message updated
+            if message_updated and self.session.phase in (FishingPhase.FIGHTING, FishingPhase.TENSION_HIGH) and self.is_active():
+                # Cancel old fight task and start new one
+                if self._fight_task and not self._fight_task.done():
+                    self._fight_task.cancel()
+                
+                self._fight_task = asyncio.create_task(self._start_fight_sequence(interaction))
         finally:
             self._processing = False
     
@@ -1231,6 +1386,10 @@ class ActiveFishingView(BaseView):
         """Handle Stop Fishing button - return to location."""
         self._waiting_for_bite = False
         self._waiting_for_strike = False
+        
+        # Cancel all running tasks to prevent them from trying to update after view closes
+        self._cancel_all_tasks()
+        
         self.stop()
         new_view = FishingView(cog=self.cog, author=self.author, location=self.location)
         embed = await new_view.create_fishing_embed(interaction.guild)
@@ -1245,4 +1404,8 @@ class ActiveFishingView(BaseView):
         """Handle view timeout."""
         self._waiting_for_bite = False
         self._waiting_for_strike = False
+        
+        # Cancel all running tasks to prevent them from trying to update after timeout
+        self._cancel_all_tasks()
+        
         await super().on_timeout()
