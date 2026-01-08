@@ -674,6 +674,23 @@ class ActiveFishingView(BaseView):
         """Update timestamp when user clicks a button."""
         self._last_user_interaction = time.time()
     
+    async def _disable_buttons_and_stop(self):
+        """Disable all buttons, update the message, then stop the view."""
+        # Disable all buttons
+        for item in self.children:
+            if isinstance(item, discord.ui.Button):
+                item.disabled = True
+        
+        # Update the message to show disabled buttons
+        if self.message:
+            try:
+                await self.message.edit(view=self)
+            except (discord.NotFound, discord.HTTPException):
+                pass
+        
+        # Now stop the view
+        self.stop()
+    
     async def create_fishing_embed(self, guild: discord.Guild) -> discord.Embed:
         """Create the active fishing embed."""
         from ..commands.helper_functions import ensure_lure_uses
@@ -1146,7 +1163,7 @@ class ActiveFishingView(BaseView):
             self.session.add_message("*You've been idle too long. The fish escapes!*")
             self.session.phase = FishingPhase.ESCAPED
             self._cancel_all_tasks()
-            self.stop()
+            await self._disable_buttons_and_stop()
             return
         
         if self.session.phase not in (FishingPhase.FIGHTING, FishingPhase.TENSION_HIGH):
@@ -1206,7 +1223,7 @@ class ActiveFishingView(BaseView):
             self.session.add_message("*You've been idle too long. The fish escapes!*")
             self.session.phase = FishingPhase.ESCAPED
             self._cancel_all_tasks()
-            self.stop()
+            await self._disable_buttons_and_stop()
             return
         
         if self.session.phase != FishingPhase.TENSION_HIGH:
@@ -1403,5 +1420,8 @@ class ActiveFishingView(BaseView):
         
         # Cancel all running tasks to prevent them from trying to update after timeout
         self._cancel_all_tasks()
+        
+        # Disable buttons and update message
+        await self._disable_buttons_and_stop()
         
         await super().on_timeout()
