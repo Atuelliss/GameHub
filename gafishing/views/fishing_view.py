@@ -624,6 +624,10 @@ class ActiveFishingView(BaseView):
         self._last_user_interaction: float = time.time()
         self._user_timeout_seconds: float = 120.0  # 2 minutes of no user clicks = timeout
         
+        # Anti-spam: Track last reel time and enforce cooldown
+        self._last_reel_time: float = 0.0
+        self._reel_cooldown: float = 2.5  # 2.5 second minimum between reels
+        
         # Task tracking for proper cancellation
         self._bite_task: Optional[asyncio.Task] = None
         self._hook_task: Optional[asyncio.Task] = None
@@ -1202,10 +1206,12 @@ class ActiveFishingView(BaseView):
         
         self._update_buttons()
         embed = await self.create_fishing_embed(interaction.guild)
+        
+        # Try to update the message, but don't stop the fight if it fails
         try:
             await self.message.edit(embed=embed, view=self)
         except (discord.NotFound, discord.HTTPException):
-            return
+            pass  # Continue fighting even if UI update fails
         
         # If tension high, wait for timeout then process
         if phase == FishingPhase.TENSION_HIGH and self.is_active():
@@ -1267,13 +1273,23 @@ class ActiveFishingView(BaseView):
     
     async def _on_reel_during_tension(self, interaction: discord.Interaction):
         """Handle Reel In button during high tension - this is a MISTAKE!"""
+        # Check cooldown first - silently ignore if too soon
+        current_time = time.time()
+        if current_time - self._last_reel_time < self._reel_cooldown:
+            try:
+                await interaction.response.defer()
+            except:
+                pass
+            return
+        
         # Prevent click spam
         if await self._check_processing(interaction):
             return
         self._processing = True
         
-        # Track user interaction
+        # Track user interaction and reel time
         self._update_user_interaction()
+        self._last_reel_time = current_time
         
         try:
             # Cancel tension task if player clicked during it
@@ -1311,25 +1327,29 @@ class ActiveFishingView(BaseView):
                 except (discord.NotFound, discord.HTTPException):
                     pass
             
-            # If still fighting (just got a warning), continue sequence - only if message updated
-            if message_updated and self.session.phase in (FishingPhase.FIGHTING, FishingPhase.TENSION_HIGH) and self.is_active():
-                # Cancel old fight task and start new one
-                if self._fight_task and not self._fight_task.done():
-                    self._fight_task.cancel()
-                
-                self._fight_task = asyncio.create_task(self._start_fight_sequence(interaction))
+            # Fight sequence continues automatically, no need to restart it
         finally:
             self._processing = False
     
     async def _on_reel_in(self, interaction: discord.Interaction):
         """Handle Reel In button during fight."""
+        # Check cooldown first - silently ignore if too soon
+        current_time = time.time()
+        if current_time - self._last_reel_time < self._reel_cooldown:
+            try:
+                await interaction.response.defer()
+            except:
+                pass
+            return
+        
         # Prevent click spam
         if await self._check_processing(interaction):
             return
         self._processing = True
         
-        # Track user interaction
+        # Track user interaction and reel time
         self._update_user_interaction()
+        self._last_reel_time = current_time
         
         try:
             conf = self.cog.db.get_conf(interaction.guild)
@@ -1365,13 +1385,7 @@ class ActiveFishingView(BaseView):
                 except (discord.NotFound, discord.HTTPException):
                     pass
             
-            # If still fighting, continue sequence - only if message updated
-            if message_updated and self.session.phase in (FishingPhase.FIGHTING, FishingPhase.TENSION_HIGH) and self.is_active():
-                # Cancel old fight task and start new one
-                if self._fight_task and not self._fight_task.done():
-                    self._fight_task.cancel()
-                
-                self._fight_task = asyncio.create_task(self._start_fight_sequence(interaction))
+            # Fight sequence continues automatically, no need to restart it
         finally:
             self._processing = False
     
