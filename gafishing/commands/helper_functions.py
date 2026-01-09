@@ -1100,12 +1100,28 @@ def get_fight_event(session: FishingSession) -> tuple:
         (FishingPhase.FIGHTING, "*The fish is tiring! Keep reeling!*", True),
     ]
     
+    # Dynamic tension probability based on line distance
+    # As fish gets closer (lower distance), tension events become more likely
+    # Assume fish started around 50-100 feet away, scale tension from 25% to 75%
+    current_distance = session.line_distance
+    
+    # Calculate tension probability based on current distance
+    # At 50+ feet: 25% tension, decreasing to 75% tension at 0 feet
+    if current_distance >= 50:
+        tension_probability = 0.25
+    elif current_distance <= 0:
+        tension_probability = 0.75
+    else:
+        # Linear scale from 25% at 50ft to 75% at 0ft
+        distance_ratio = current_distance / 50.0  # 1.0 at 50ft, 0.0 at 0ft
+        tension_probability = 0.75 - (distance_ratio * 0.5)  # 0.75 at 0ft, 0.25 at 50ft
+    
     # Weight toward fighting events (reel) vs tension events (wait)
-    if random.random() < 0.25:
-        # 25% chance of tension event
+    if random.random() < tension_probability:
+        # Tension event - fish fights harder as it gets closer
         event = random.choice([e for e in events if e[0] == FishingPhase.TENSION_HIGH])
     else:
-        # 75% chance of fighting event
+        # Fighting event - safe to reel
         event = random.choice([e for e in events if e[0] == FishingPhase.FIGHTING])
     
     phase, msg, should_reel = event
