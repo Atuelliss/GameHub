@@ -1163,12 +1163,19 @@ class ActiveFishingView(BaseView):
     
     async def _start_fight_sequence(self, interaction: discord.Interaction):
         """Start the fish fighting sequence."""
+        # Store reference to this task so we can check if we've been superseded
+        my_task = asyncio.current_task()
+        
         await asyncio.sleep(2)  # Brief pause
         
         # Check if view is still active
         if not self.is_active():
             self.session.add_message("DEBUG: Fight stopped - view not active")
             return
+        
+        # Check if we've been replaced by a newer task
+        if self._fight_task != my_task:
+            return  # A newer fight task has been started, exit quietly
         
         # Check if user has been inactive too long
         if self._should_timeout_from_inactivity():
@@ -1196,6 +1203,10 @@ class ActiveFishingView(BaseView):
         
         if not self.is_active():
             return
+        
+        # Check again if we've been superseded (player might have clicked during wait)
+        if self._fight_task != my_task:
+            return  # Exit quietly, newer task will handle it
         
         # Get next fight event
         phase, msg, should_reel = get_fight_event(self.session)
@@ -1226,11 +1237,18 @@ class ActiveFishingView(BaseView):
     
     async def _wait_for_tension_release(self, interaction: discord.Interaction):
         """Wait during high tension phase."""
+        # Store reference to this task so we can check if we've been superseded
+        my_task = asyncio.current_task()
+        
         await asyncio.sleep(3)  # 3 second wait
         
         # Check if view is still active
         if not self.is_active():
             return
+        
+        # Check if we've been replaced by a newer task
+        if self._tension_task != my_task:
+            return  # A newer tension task has been started, exit quietly
         
         # Check if user has been inactive too long
         if self._should_timeout_from_inactivity():
@@ -1252,6 +1270,10 @@ class ActiveFishingView(BaseView):
         
         if not self.is_active():
             return
+        
+        # Check again if we've been superseded (player might have clicked during wait)
+        if self._tension_task != my_task:
+            return  # Exit quietly, newer task will handle it
         
         # Player waited correctly
         success, msg, landed = process_reel_attempt(self.session, did_reel=False)
@@ -1327,7 +1349,16 @@ class ActiveFishingView(BaseView):
                 except (discord.NotFound, discord.HTTPException):
                     pass
             
-            # Fight sequence continues automatically, no need to restart it
+            # Restart fight sequence if still fighting (player interaction canceled the auto-task)
+            if message_updated and self.is_active():
+                if self.session.phase == FishingPhase.FIGHTING:
+                    if self._fight_task and not self._fight_task.done():
+                        self._fight_task.cancel()
+                    self._fight_task = asyncio.create_task(self._start_fight_sequence(interaction))
+                elif self.session.phase == FishingPhase.TENSION_HIGH:
+                    if self._tension_task and not self._tension_task.done():
+                        self._tension_task.cancel()
+                    self._tension_task = asyncio.create_task(self._wait_for_tension_release(interaction))
         finally:
             self._processing = False
     
@@ -1385,7 +1416,16 @@ class ActiveFishingView(BaseView):
                 except (discord.NotFound, discord.HTTPException):
                     pass
             
-            # Fight sequence continues automatically, no need to restart it
+            # Restart fight sequence if still fighting (player interaction canceled the auto-task)
+            if message_updated and self.is_active():
+                if self.session.phase == FishingPhase.FIGHTING:
+                    if self._fight_task and not self._fight_task.done():
+                        self._fight_task.cancel()
+                    self._fight_task = asyncio.create_task(self._start_fight_sequence(interaction))
+                elif self.session.phase == FishingPhase.TENSION_HIGH:
+                    if self._tension_task and not self._tension_task.done():
+                        self._tension_task.cancel()
+                    self._tension_task = asyncio.create_task(self._wait_for_tension_release(interaction))
         finally:
             self._processing = False
     
