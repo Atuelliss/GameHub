@@ -2,6 +2,7 @@
 # Rarity options: "common", "uncommon", "rare", "epic", "legendary" (fill in later)
 # Seasons: "spring", "summer", "autumn", "winter" or None for all
 # Weather: "sunny", "cloudy", "stormy", "cold", "hot" or None for all
+# required_rod: Specific rod ID required to catch this fish, or None for any compatible rod
 
 FISH_DATABASE = {
     # ==================== FRESHWATER FISH ====================
@@ -17,6 +18,7 @@ FISH_DATABASE = {
         "best_weather": "cloudy",
         "preferred_bait": ["rubber_worms", "spinnerbait"],
         "rarity": "uncommon",
+        "required_rod": None,
         "base_fishpoints": 20,
     },
     "bass_spotted": {
@@ -31,6 +33,7 @@ FISH_DATABASE = {
         "best_weather": "cloudy",
         "preferred_bait": ["jerkbait", "spoons"],
         "rarity": "uncommon",
+        "required_rod": None,
         "base_fishpoints": 20,
     },
     "bluegill": {
@@ -45,6 +48,7 @@ FISH_DATABASE = {
         "best_weather": "sunny",
         "preferred_bait": ["breadballs"],
         "rarity": "common",
+        "required_rod": None,
         "base_fishpoints": 8,
     },
     "brown_bullhead_catfish": {
@@ -59,6 +63,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["any"],
         "rarity": "common",
+        "required_rod": None,
         "base_fishpoints": 8,
     },
     "channel_catfish": {
@@ -73,6 +78,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["any"],
         "rarity": "common",
+        "required_rod": None,
         "base_fishpoints": 8,
     },
     "crappie_black": {
@@ -87,6 +93,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["breadballs"],
         "rarity": "common",
+        "required_rod": None,
         "base_fishpoints": 8,
     },
     "yellow_perch": {
@@ -101,6 +108,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["breadballs", "rubber_worms"],
         "rarity": "common",
+        "required_rod": None,
         "base_fishpoints": 8,
     },
     "chain_pickerel": {
@@ -115,6 +123,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["jerkbait", "spoons"],
         "rarity": "uncommon",
+        "required_rod": None,
         "base_fishpoints": 20,
     },
     "spotted_gar": {
@@ -129,6 +138,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["any"],
         "rarity": "rare",
+        "required_rod": None,
         "base_fishpoints": 50,
     },
     "river_trout": {
@@ -143,6 +153,7 @@ FISH_DATABASE = {
         "best_weather": "cold",
         "preferred_bait": ["grubs"],
         "rarity": "uncommon",
+        "required_rod": None,
         "base_fishpoints": 20,
     },
     "redear_sunfish": {
@@ -157,6 +168,112 @@ FISH_DATABASE = {
         "best_weather": "sunny",
         "preferred_bait": ["grubs"],
         "rarity": "common",
+        "required_rod": None,
+        "base_fishpoints": 8,
+    },
+    "walleye": {
+        "name": "Walleye",
+        "water_type": "freshwater",
+        "locations": ["lake", "river"],
+        "min_weight_oz": 16.0,
+        "max_weight_oz": 192.0,
+        "max_length_inches": 31,
+        "best_season": "spring",
+        "worst_season": "summer",
+        "best_weather": "cloudy",
+        "preferred_bait": ["jerkbait", "spoons", "rubber_worms"],
+        "rarity": "uncommon",
+        "required_rod": None,
+        "base_fishpoints": 20,
+    },
+    "northern_pike": {
+        "name": "Northern Pike",
+        "water_type": "freshwater",
+        "locations": ["lake", "river"],
+        "min_weight_oz": 32.0,
+        "max_weight_oz": 400.0,
+        "max_length_inches": 46,
+        "best_season": "spring",
+        "worst_season": None,
+        "best_weather": "cloudy",
+        "preferred_bait": ["spoons", "jerkbait", "spinnerbait"],
+        "rarity": "rare",
+        "required_rod": None,
+        "base_fishpoints": 50,
+    },
+    "muskellunge": {
+        "name": "Muskellunge",
+        "water_type": "freshwater",
+        "locations": ["lake", "river"],
+        "min_weight_oz": 240.0,
+        "max_weight_oz": 640.0,
+        "max_length_inches": 50,
+        "best_season": "autumn",
+        "worst_season": None,
+        "best_weather": "cloudy",
+        "preferred_bait": ["jerkbait", "spoons"],
+        "rarity": "epic",
+        "required_rod": None,
+        "base_fishpoints": 120,
+    },
+    "rainbow_trout": {
+        "name": "Rainbow Trout",
+        "water_type": "freshwater",
+        "locations": ["river"],
+        "min_weight_oz": 16.0,
+        "max_weight_oz": 80.0,
+        "max_length_inches": 20,
+        "best_season": "spring",
+        "worst_season": "summer",
+        "best_weather": "cold",
+        "preferred_bait": ["grubs"],
+        "rarity": "uncommon",
+        "required_rod": "flyfishing_rod",
+        "base_fishpoints": 20,
+    },
+    "brook_trout": {
+        "name": "Brook Trout",
+        "water_type": "freshwater",
+        "locations": ["river"],
+        "min_weight_oz": 12.0,
+        "max_weight_oz": 64.0,
+        "max_length_inches": 18,
+        "best_season": "autumn",
+        "worst_season": "summer",
+        "best_weather": "cold",
+        "preferred_bait": ["grubs"],
+        "rarity": "uncommon",
+        "required_rod": None,
+        "base_fishpoints": 20,
+    },
+    "common_carp": {
+        "name": "Common Carp",
+        "water_type": "freshwater",
+        "locations": ["pond", "lake", "river"],
+        "min_weight_oz": 160.0,
+        "max_weight_oz": 640.0,
+        "max_length_inches": 40,
+        "best_season": "summer",
+        "worst_season": None,
+        "best_weather": "hot",
+        "preferred_bait": ["breadballs", "any"],
+        "rarity": "common",
+        "required_rod": None,
+        "base_fishpoints": 8,
+    },
+    "rock_bass": {
+        "name": "Rock Bass",
+        "water_type": "freshwater",
+        "locations": ["river"],
+        "min_weight_oz": 6.0,
+        "max_weight_oz": 32.0,
+        "max_length_inches": 10,
+        "best_season": "spring",
+        "worst_season": None,
+        "best_weather": None,
+        "preferred_bait": ["grubs", "rubber_worms"],
+        "rarity": "common",
+        "required_rod": None,
         "base_fishpoints": 8,
     },
 
@@ -173,7 +290,23 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["rubber_worms", "mullet"],
         "rarity": "rare",
+        "required_rod": None,
         "base_fishpoints": 50,
+    },
+    "bull_shark": {
+        "name": "Bull Shark",
+        "water_type": "both",
+        "locations": ["river", "ocean"],
+        "min_weight_oz": 320.0,
+        "max_weight_oz": 8160,
+        "max_length_inches": 130.8,
+        "best_season": "summer",
+        "worst_season": "winter",
+        "best_weather": "hot",
+        "preferred_bait": ["any"],
+        "rarity": "legendary",
+        "required_rod": "shark_rod",
+        "base_fishpoints": 325,
     },
 
     # ==================== SALTWATER FISH ====================
@@ -189,6 +322,7 @@ FISH_DATABASE = {
         "best_weather": "hot",
         "preferred_bait": ["shrimp", "mullet"],
         "rarity": "rare",
+        "required_rod": None,
         "base_fishpoints": 50,
     },
     "speckled_trout": {
@@ -203,6 +337,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["shad", "shrimp"],
         "rarity": "uncommon",
+        "required_rod": None,
         "base_fishpoints": 20,
     },
     "red_drum": {
@@ -217,6 +352,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["shrimp", "mullet"],
         "rarity": "rare",
+        "required_rod": None,
         "base_fishpoints": 50,
     },
     "red_grouper": {
@@ -231,6 +367,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["cut_squid"],
         "rarity": "rare",
+        "required_rod": None,
         "base_fishpoints": 50,
     },
     "red_snapper": {
@@ -245,6 +382,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["cut_squid", "shad"],
         "rarity": "rare",
+        "required_rod": None,
         "base_fishpoints": 50,
     },
     "king_mackerel": {
@@ -259,6 +397,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["mullet"],
         "rarity": "uncommon",
+        "required_rod": None,
         "base_fishpoints": 20,
     },
     "tarpon": {
@@ -273,6 +412,7 @@ FISH_DATABASE = {
         "best_weather": "hot",
         "preferred_bait": ["mullet"],
         "rarity": "epic",
+        "required_rod": None,
         "base_fishpoints": 120,
     },
     "sailfish": {
@@ -287,6 +427,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["mullet"],
         "rarity": "legendary",
+        "required_rod": None,
         "base_fishpoints": 300,
     },
     "blacktip_shark": {
@@ -301,6 +442,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["any"],
         "rarity": "legendary",
+        "required_rod": "shark_rod",
         "base_fishpoints": 300,
     },
     "tiger_shark": {
@@ -315,21 +457,8 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["any"],
         "rarity": "legendary",
+        "required_rod": "shark_rod",
         "base_fishpoints": 350,
-    },
-    "bull_shark": {
-        "name": "Bull Shark",
-        "water_type": "both",
-        "locations": ["river", "ocean"],
-        "min_weight_oz": 320.0,
-        "max_weight_oz": 8160,
-        "max_length_inches": 130.8,
-        "best_season": "summer",
-        "worst_season": "winter",
-        "best_weather": "hot",
-        "preferred_bait": ["any"],
-        "rarity": "legendary",
-        "base_fishpoints": 325,
     },
     "scalloped_hammerhead": {
         "name": "Scalloped Hammerhead",
@@ -343,6 +472,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["cut_squid", "shad"],
         "rarity": "epic",
+        "required_rod": "shark_rod",
         "base_fishpoints": 200,
     },
     "shortfin_mako": {
@@ -357,6 +487,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["mullet", "shad"],
         "rarity": "legendary",
+        "required_rod": "shark_rod",
         "base_fishpoints": 340,
     },
     "lemon_shark": {
@@ -371,6 +502,7 @@ FISH_DATABASE = {
         "best_weather": "hot",
         "preferred_bait": ["any"],
         "rarity": "rare",
+        "required_rod": "shark_rod",
         "base_fishpoints": 80,
     },
     "nurse_shark": {
@@ -385,6 +517,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["any"],
         "rarity": "uncommon",
+        "required_rod": "shark_rod",
         "base_fishpoints": 25,
     },
     "cobia": {
@@ -399,6 +532,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["shrimp", "mullet"],
         "rarity": "rare",
+        "required_rod": None,
         "base_fishpoints": 75,
     },
     "mahi_mahi": {
@@ -413,6 +547,7 @@ FISH_DATABASE = {
         "best_weather": "hot",
         "preferred_bait": ["mullet", "cut_squid"],
         "rarity": "uncommon",
+        "required_rod": None,
         "base_fishpoints": 30,
     },
     "wahoo": {
@@ -427,6 +562,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["mullet", "shad"],
         "rarity": "rare",
+        "required_rod": None,
         "base_fishpoints": 85,
     },
     "great_barracuda": {
@@ -441,6 +577,7 @@ FISH_DATABASE = {
         "best_weather": None,
         "preferred_bait": ["mullet", "shrimp"],
         "rarity": "uncommon",
+        "required_rod": None,
         "base_fishpoints": 28,
     },
 }
