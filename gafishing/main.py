@@ -49,14 +49,14 @@ class GreenacresFishing(
     
     def cog_unload(self) -> None:
         """Stop all active views when cog is unloaded/reloaded."""
-        log.info(f"Stopping {len(self.active_views)} active views...")
+        log.debug(f"Stopping {len(self.active_views)} active views...")
         for view in list(self.active_views):
             try:
                 view.stop()
             except Exception as e:
                 log.error(f"Error stopping view: {e}")
         self.active_views.clear()
-        log.info("All active views stopped")
+        log.debug("All active views stopped")
 
     async def initialize(self) -> None:
         await self.bot.wait_until_red_ready()
