@@ -512,6 +512,9 @@ class FishingSession:
     location: str = "pond"
     water_type: str = "freshwater"
     
+    # Equipped rod
+    rod_id: Optional[str] = None
+    
     # Current phase
     phase: FishingPhase = FishingPhase.IDLE
     
@@ -599,13 +602,19 @@ def get_eligible_fish(
     water_type: str,
     season: str,
     weather_type: str,
-    bait_id: str
+    bait_id: str,
+    rod_id: Optional[str] = None
 ) -> List[tuple]:
     """
     Get list of eligible fish with their spawn weights.
     
     Returns list of (fish_id, fish_data, weight) tuples.
-    Weight is based on rarity, season, weather, and bait match.
+    Weight is based on rarity, season, weather, bait match, and rod requirements.
+    
+    Parameters
+    ----------
+    rod_id : Optional[str]
+        The ID of the equipped rod. Used to filter fish with required_rod restrictions.
     """
     eligible = []
     
@@ -617,6 +626,11 @@ def get_eligible_fish(
         
         # Check location match
         if location not in fish_data.get("locations", []):
+            continue
+        
+        # Check rod requirement
+        required_rod = fish_data.get("required_rod")
+        if required_rod is not None and rod_id != required_rod:
             continue
         
         # Base weight from rarity
@@ -665,14 +679,15 @@ def select_fish(
     water_type: str,
     season: str,
     weather_type: str,
-    bait_id: str
+    bait_id: str,
+    rod_id: Optional[str] = None
 ) -> Optional[tuple]:
     """
     Select a random fish based on conditions.
     
     Returns (fish_id, fish_data) or None if no fish available.
     """
-    eligible = get_eligible_fish(location, water_type, season, weather_type, bait_id)
+    eligible = get_eligible_fish(location, water_type, season, weather_type, bait_id, rod_id)
     
     if not eligible:
         return None
@@ -814,7 +829,8 @@ def check_fish_interest(
     season: str,
     weather_type: str,
     bait_id: str,
-    luck_modifier: float = 1.0
+    luck_modifier: float = 1.0,
+    rod_id: Optional[str] = None
 ) -> bool:
     """
     Check if a fish is interested based on conditions.
@@ -825,7 +841,7 @@ def check_fish_interest(
     base_chance = 0.30
     
     # Get number of eligible fish - more fish = higher chance
-    eligible = get_eligible_fish(location, water_type, season, weather_type, bait_id)
+    eligible = get_eligible_fish(location, water_type, season, weather_type, bait_id, rod_id)
     if not eligible:
         return False
     
@@ -845,7 +861,8 @@ def check_fish_interest(
 def create_fishing_session(
     location: str,
     water_type: str,
-    luck_bonus: int = 0
+    luck_bonus: int = 0,
+    rod_id: Optional[str] = None
 ) -> FishingSession:
     """
     Create a new fishing session.
@@ -859,6 +876,8 @@ def create_fishing_session(
     luck_bonus : int
         Total luck bonus from equipped gear (hat, coat, boots).
         Affects fish size distribution and trophy chance.
+    rod_id : Optional[str]
+        The ID of the equipped rod.
     
     Returns
     -------
@@ -869,7 +888,8 @@ def create_fishing_session(
         location=location,
         water_type=water_type,
         phase=FishingPhase.IDLE,
-        luck_bonus=luck_bonus
+        luck_bonus=luck_bonus,
+        rod_id=rod_id
     )
     return session
 
@@ -935,7 +955,8 @@ def check_for_bite(
         season,
         weather_type,
         bait_id,
-        luck_modifier
+        luck_modifier,
+        session.rod_id
     )
     
     if interested:
@@ -1012,7 +1033,8 @@ def fish_strikes(
             session.water_type,
             season,
             weather_type,
-            bait_id
+            bait_id,
+            session.rod_id
         )
         
         if result:
