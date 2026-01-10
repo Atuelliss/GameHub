@@ -541,6 +541,9 @@ class FishingSession:
     # Messages for dynamic updates
     status_messages: List[str] = field(default_factory=list)
     
+    # Event tracking to prevent lockups
+    last_event_was_tension: bool = False  # Track if last event was tension
+    
     def add_message(self, msg: str):
         """Add a status message."""
         self.status_messages.append(msg)
@@ -1100,6 +1103,18 @@ def get_fight_event(session: FishingSession) -> tuple:
         (FishingPhase.FIGHTING, "*The fish is tiring! Keep reeling!*", True),
     ]
     
+    # ANTI-LOCKUP: Prevent consecutive tension events
+    # If the last event was tension, force this one to be fighting
+    if session.last_event_was_tension:
+        # Guarantee a fighting event so player can make progress
+        event = random.choice([e for e in events if e[0] == FishingPhase.FIGHTING])
+        phase, msg, should_reel = event
+        session.phase = phase
+        session.last_event_was_tension = False
+        session.add_message(msg)
+        session.reset_timer()
+        return (phase, msg, should_reel)
+    
     # Dynamic tension probability based on line distance
     # As fish gets closer (lower distance), tension events become more likely
     # Assume fish started around 50-100 feet away, scale tension from 25% to 75%
@@ -1120,9 +1135,11 @@ def get_fight_event(session: FishingSession) -> tuple:
     if random.random() < tension_probability:
         # Tension event - fish fights harder as it gets closer
         event = random.choice([e for e in events if e[0] == FishingPhase.TENSION_HIGH])
+        session.last_event_was_tension = True
     else:
         # Fighting event - safe to reel
         event = random.choice([e for e in events if e[0] == FishingPhase.FIGHTING])
+        session.last_event_was_tension = False
     
     phase, msg, should_reel = event
     session.phase = phase
@@ -1154,14 +1171,13 @@ def process_reel_attempt(session: FishingSession, did_reel: bool) -> tuple:
         # During high tension, player should NOT reel
         if did_reel:
             # They reeled during high tension - bad!
-            session.botched_attempts += 1
             if session.is_line_snapped():
                 session.phase = FishingPhase.ESCAPED
                 msg = f"*SNAP! The line breaks from too much tension! The {fish_name} escapes!*"
                 session.add_message(msg)
                 return (False, msg, False)
             else:
-                session.fish_pulls_out(5)
+                session.fish_pulls_out(5)  # This increments botched_attempts
                 msg = f"*The line strains dangerously! The fish pulls out more line! ({session.botched_attempts}/{session.max_botched} mistakes)*"
                 session.add_message(msg)
                 return (False, msg, False)
