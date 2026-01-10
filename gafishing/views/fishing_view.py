@@ -606,11 +606,18 @@ class ActiveFishingView(BaseView):
         self.location_data = location_data or FISHING_LOCATIONS.get(location, FISHING_LOCATIONS["pond"])
         self.luck_bonus = luck_bonus  # Store for session resets
         
-        # Create fishing session with luck bonus
+        # Get equipped rod
+        conf = cog.db.get_conf(author.guild)
+        user_data = conf.get_user(author)
+        equipped_rod = user_data.get_equipped_rod()
+        rod_id = equipped_rod.get("rod_id", "") if equipped_rod else None
+        
+        # Create fishing session with luck bonus and rod
         self.session = create_fishing_session(
             location=location,
             water_type=self.location_data.get("water_type", "freshwater"),
-            luck_bonus=luck_bonus
+            luck_bonus=luck_bonus,
+            rod_id=rod_id
         )
         
         # Timing control
