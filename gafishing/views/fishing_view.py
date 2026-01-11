@@ -635,6 +635,9 @@ class ActiveFishingView(BaseView):
         self._last_reel_time: float = 0.0
         self._reel_cooldown: float = 2.5  # 2.5 second minimum between reels
         
+        # Store latest interaction for auto-updates
+        self._latest_interaction: Optional[discord.Interaction] = None
+        
         # Task tracking for proper cancellation
         self._bite_task: Optional[asyncio.Task] = None
         self._hook_task: Optional[asyncio.Task] = None
@@ -1129,8 +1132,12 @@ class ActiveFishingView(BaseView):
             return
         self._processing = True
         
-        # Track user interaction
+        # Track user interaction and store latest interaction
         self._update_user_interaction()
+        self._latest_interaction = interaction
+        
+        # Defer immediately to prevent timeout
+        await interaction.response.defer()
         
         try:
             self._waiting_for_strike = False
@@ -1147,7 +1154,7 @@ class ActiveFishingView(BaseView):
             
             message_updated = False
             try:
-                await interaction.response.edit_message(embed=embed, view=self)
+                await interaction.edit_original_response(embed=embed, view=self)
                 message_updated = True
             except (discord.NotFound, discord.HTTPException):
                 # Interaction failed, try direct message edit
@@ -1173,7 +1180,7 @@ class ActiveFishingView(BaseView):
         # Store reference to this task so we can check if we've been superseded
         my_task = asyncio.current_task()
         
-        await asyncio.sleep(2)  # Brief pause
+        await asyncio.sleep(3.5)  # Brief pause - increased from 2s to reduce collision with user clicks
         
         # Check if view is still active
         if not self.is_active():
@@ -1202,11 +1209,18 @@ class ActiveFishingView(BaseView):
             return
         
         # Wait for any user interactions to complete before updating
-        max_wait = 10  # Maximum 1 second wait
+        max_wait = 30  # Maximum 3 seconds wait - increased for better user priority
         wait_count = 0
         while self._processing and wait_count < max_wait:
             await asyncio.sleep(0.1)
             wait_count += 1
+        
+        # If still processing after 3 seconds, skip this auto-update to avoid conflicts
+        if self._processing:
+            # Reschedule for later
+            if self.is_active():
+                self._fight_task = asyncio.create_task(self._start_fight_sequence(self._latest_interaction or interaction))
+            return
         
         if not self.is_active():
             return
@@ -1269,11 +1283,18 @@ class ActiveFishingView(BaseView):
             return
         
         # Wait for any user interactions to complete before updating
-        max_wait = 10  # Maximum 1 second wait
+        max_wait = 30  # Maximum 3 seconds wait - increased for better user priority
         wait_count = 0
         while self._processing and wait_count < max_wait:
             await asyncio.sleep(0.1)
             wait_count += 1
+        
+        # If still processing after 3 seconds, skip this auto-update to avoid conflicts
+        if self._processing:
+            # Reschedule for later
+            if self.is_active():
+                self._tension_task = asyncio.create_task(self._wait_for_tension_release(self._latest_interaction or interaction))
+            return
         
         if not self.is_active():
             return
@@ -1297,8 +1318,8 @@ class ActiveFishingView(BaseView):
             return
         
         if self.session.phase == FishingPhase.FIGHTING and self.is_active():
-            # Continue fight - just create new task, don't cancel current one
-            self._fight_task = asyncio.create_task(self._start_fight_sequence(interaction))
+            # Continue fight - use latest interaction if available
+            self._fight_task = asyncio.create_task(self._start_fight_sequence(self._latest_interaction or interaction))
     
     async def _on_reel_during_tension(self, interaction: discord.Interaction):
         """Handle Reel In button during high tension - this is a MISTAKE!"""
@@ -1316,9 +1337,13 @@ class ActiveFishingView(BaseView):
             return
         self._processing = True
         
-        # Track user interaction and reel time
+        # Track user interaction, reel time, and store latest interaction
         self._update_user_interaction()
         self._last_reel_time = current_time
+        self._latest_interaction = interaction
+        
+        # Defer immediately to prevent timeout
+        await interaction.response.defer()
         
         try:
             # Cancel tension task if player clicked during it
@@ -1346,7 +1371,7 @@ class ActiveFishingView(BaseView):
             
             message_updated = False
             try:
-                await interaction.response.edit_message(embed=embed, view=self)
+                await interaction.edit_original_response(embed=embed, view=self)
                 message_updated = True
             except (discord.NotFound, discord.HTTPException):
                 # Interaction failed, try direct message edit
@@ -1385,9 +1410,13 @@ class ActiveFishingView(BaseView):
             return
         self._processing = True
         
-        # Track user interaction and reel time
+        # Track user interaction, reel time, and store latest interaction
         self._update_user_interaction()
         self._last_reel_time = current_time
+        self._latest_interaction = interaction
+        
+        # Defer immediately to prevent timeout
+        await interaction.response.defer()
         
         try:
             conf = self.cog.db.get_conf(interaction.guild)
@@ -1413,7 +1442,7 @@ class ActiveFishingView(BaseView):
             
             message_updated = False
             try:
-                await interaction.response.edit_message(embed=embed, view=self)
+                await interaction.edit_original_response(embed=embed, view=self)
                 message_updated = True
             except (discord.NotFound, discord.HTTPException):
                 # Interaction failed, try direct message edit
