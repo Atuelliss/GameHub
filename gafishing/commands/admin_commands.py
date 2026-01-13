@@ -909,6 +909,11 @@ class FishSetupView(discord.ui.View):
         
         try:
             msg = await self.cog.bot.wait_for("message", check=check, timeout=120.0)
+            
+            # Check if we're still awaiting (wasn't cancelled)
+            if not self.awaiting_rate:
+                return
+            
             try:
                 rate = int(msg.content.strip())
                 if rate <= 0:
@@ -932,6 +937,7 @@ class FishSetupView(discord.ui.View):
     
     async def _keep_default_rate(self, interaction: discord.Interaction):
         """Keep default conversion rate."""
+        self.awaiting_rate = False  # Cancel any listening task
         await self._complete_setup(interaction)
     
     async def _complete_setup(self, interaction: discord.Interaction):
