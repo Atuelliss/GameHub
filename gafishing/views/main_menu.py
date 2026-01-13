@@ -19,7 +19,8 @@ from ..common.weather import get_weather_for_guild, get_weather_display, get_wea
 async def create_main_menu_embed(
     cog: "GreenacresFishing",
     guild: discord.Guild,
-    user: discord.Member
+    user: discord.Member,
+    prefix: str = "!"
 ) -> discord.Embed:
     """
     Create the main menu embed with current game time, weather, and user stats.
@@ -28,6 +29,7 @@ async def create_main_menu_embed(
         cog: The GreenacresFishing cog instance
         guild: The Discord guild
         user: The Discord member
+        prefix: The command prefix for the server
     
     Returns:
         A Discord embed for the main menu
@@ -102,6 +104,6 @@ async def create_main_menu_embed(
     )
     
     # Set footer
-    embed.set_footer(text="Select an option below to get started!")
+    embed.set_footer(text=f"Select an option below to get started! Or use the `{prefix}fishinfo` command for help.")
     
     return embed
