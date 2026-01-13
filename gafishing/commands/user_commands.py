@@ -187,10 +187,7 @@ class User(MixinMeta):
         # Last scavenge
         embed.set_footer(text=f"🗑️ Last Scavenge: {last_scavenge}")
         
-        # Check if conversion is enabled - if so, use the view with buttons
-        if conf.discord_currency_conversion_enabled and target.id == ctx.author.id:
-            view = FishInfoView(cog=self, author=ctx.author, target=target, embed=embed)
-            message = await ctx.send(embed=embed, view=view)
-            view.message = message
-        else:
-            await ctx.send(embed=embed)
+        # Always create the view (for Help/Close buttons)
+        view = FishInfoView(cog=self, author=ctx.author, target=target, embed=embed, prefix=ctx.prefix)
+        message = await ctx.send(embed=embed, view=view)
+        view.message = message
