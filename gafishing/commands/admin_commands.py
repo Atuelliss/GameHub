@@ -427,6 +427,520 @@ class WipeUsersConfirmView(discord.ui.View):
         self.stop()
 
 
+class FishSetupView(discord.ui.View):
+    """Interactive setup view with embed-based steps."""
+    
+    def __init__(self, cog, ctx: commands.Context, conf):
+        super().__init__(timeout=300.0)
+        self.cog = cog
+        self.ctx = ctx
+        self.conf = conf
+        self.message = None
+        self.current_step = "welcome"
+        self.awaiting_timezone = False
+        self.awaiting_rate = False
+        
+        self._setup_welcome_buttons()
+    
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.ctx.author.id:
+            await interaction.response.send_message("This isn't your setup session!", ephemeral=True)
+            return False
+        return True
+    
+    def _setup_welcome_buttons(self):
+        """Setup buttons for welcome screen."""
+        self.clear_items()
+        
+        start_btn = discord.ui.Button(
+            label="Start Setup",
+            emoji="🎣",
+            style=discord.ButtonStyle.success,
+            row=0
+        )
+        start_btn.callback = self._start_setup
+        self.add_item(start_btn)
+        
+        cancel_btn = discord.ui.Button(
+            label="Cancel",
+            emoji="❌",
+            style=discord.ButtonStyle.danger,
+            row=0
+        )
+        cancel_btn.callback = self._cancel_setup
+        self.add_item(cancel_btn)
+    
+    def _setup_timezone_buttons(self):
+        """Setup buttons for timezone step."""
+        self.clear_items()
+        
+        help_btn = discord.ui.Button(
+            label="View Timezones",
+            emoji="🌍",
+            style=discord.ButtonStyle.primary,
+            row=0
+        )
+        help_btn.callback = self._show_timezone_help
+        self.add_item(help_btn)
+        
+        skip_btn = discord.ui.Button(
+            label="Skip",
+            emoji="⏭️",
+            style=discord.ButtonStyle.secondary,
+            row=0
+        )
+        skip_btn.callback = self._skip_timezone
+        self.add_item(skip_btn)
+    
+    def _setup_hemisphere_buttons(self):
+        """Setup buttons for hemisphere selection."""
+        self.clear_items()
+        
+        north_btn = discord.ui.Button(
+            label="Northern Hemisphere",
+            emoji="🧭",
+            style=discord.ButtonStyle.primary,
+            row=0
+        )
+        north_btn.callback = self._select_hemisphere_north
+        self.add_item(north_btn)
+        
+        south_btn = discord.ui.Button(
+            label="Southern Hemisphere",
+            emoji="🧭",
+            style=discord.ButtonStyle.primary,
+            row=0
+        )
+        south_btn.callback = self._select_hemisphere_south
+        self.add_item(south_btn)
+        
+        skip_btn = discord.ui.Button(
+            label="Skip",
+            emoji="⏭️",
+            style=discord.ButtonStyle.secondary,
+            row=1
+        )
+        skip_btn.callback = self._skip_hemisphere
+        self.add_item(skip_btn)
+    
+    def _setup_game_enable_buttons(self):
+        """Setup buttons for enabling the game."""
+        self.clear_items()
+        
+        enable_btn = discord.ui.Button(
+            label="Enable Game",
+            emoji="🟢",
+            style=discord.ButtonStyle.success,
+            row=0
+        )
+        enable_btn.callback = self._enable_game
+        self.add_item(enable_btn)
+        
+        disable_btn = discord.ui.Button(
+            label="Keep Disabled",
+            emoji="🔴",
+            style=discord.ButtonStyle.secondary,
+            row=0
+        )
+        disable_btn.callback = self._disable_game
+        self.add_item(disable_btn)
+    
+    def _setup_conversion_buttons(self):
+        """Setup buttons for currency conversion."""
+        self.clear_items()
+        
+        enable_btn = discord.ui.Button(
+            label="Enable Conversion",
+            emoji="💱",
+            style=discord.ButtonStyle.success,
+            row=0
+        )
+        enable_btn.callback = self._enable_conversion
+        self.add_item(enable_btn)
+        
+        disable_btn = discord.ui.Button(
+            label="Disable Conversion",
+            emoji="🚫",
+            style=discord.ButtonStyle.secondary,
+            row=0
+        )
+        disable_btn.callback = self._disable_conversion
+        self.add_item(disable_btn)
+    
+    def _setup_rate_buttons(self):
+        """Setup buttons for conversion rate."""
+        self.clear_items()
+        
+        custom_btn = discord.ui.Button(
+            label="Set Custom Rate",
+            emoji="⚙️",
+            style=discord.ButtonStyle.primary,
+            row=0
+        )
+        custom_btn.callback = self._set_custom_rate
+        self.add_item(custom_btn)
+        
+        default_btn = discord.ui.Button(
+            label="Keep Default",
+            emoji="✅",
+            style=discord.ButtonStyle.success,
+            row=0
+        )
+        default_btn.callback = self._keep_default_rate
+        self.add_item(default_btn)
+    
+    # Embed generators
+    def get_welcome_embed(self) -> discord.Embed:
+        """Generate welcome embed."""
+        embed = discord.Embed(
+            title="🎣 Greenacres Fishing Setup",
+            description=(
+                "Welcome to the setup wizard for Greenacres Fishing!\n\n"
+                "This will guide you through:\n"
+                "• Setting your server's timezone\n"
+                "• Choosing your hemisphere\n"
+                "• Enabling the game\n"
+                "• Configuring currency conversion\n\n"
+                "Click **Start Setup** to begin!"
+            ),
+            color=discord.Color.blue()
+        )
+        return embed
+    
+    def get_timezone_embed(self) -> discord.Embed:
+        """Generate timezone selection embed."""
+        embed = discord.Embed(
+            title="🌍 Step 1/5: Select Timezone",
+            description=(
+                f"**Current timezone:** `{self.conf.timezone}`\n\n"
+                "Please type your server's timezone in chat.\n"
+                "Examples: `America/New_York`, `Europe/London`, `UTC`\n\n"
+                "• Click **View Timezones** to browse available timezones\n"
+                "• Click **Skip** to keep the current setting\n\n"
+                "⏰ **Waiting for your timezone input...**"
+            ),
+            color=discord.Color.blue()
+        )
+        return embed
+    
+    def get_hemisphere_embed(self) -> discord.Embed:
+        """Generate hemisphere selection embed."""
+        embed = discord.Embed(
+            title="🧭 Step 2/5: Select Hemisphere",
+            description=(
+                f"**Current hemisphere:** `{self.conf.hemisphere.title()}ern`\n\n"
+                "This affects season calculation for fish availability.\n\n"
+                "Select your hemisphere:"
+            ),
+            color=discord.Color.blue()
+        )
+        return embed
+    
+    def get_game_time_embed(self) -> discord.Embed:
+        """Generate game time preview embed."""
+        from .helper_functions import get_game_calendar, get_game_time_of_day
+        
+        calendar = get_game_calendar(self.cog.db, self.ctx.guild)
+        time_of_day = get_game_time_of_day(self.cog.db, self.ctx.guild)
+        tz = ZoneInfo(self.conf.timezone)
+        real_now = datetime.now(tz)
+        
+        embed = discord.Embed(
+            title="📅 Step 3/5: Game Time Preview",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(
+            name="🎮 Game Time",
+            value=f"{time_of_day['emoji']} **{time_of_day['name']}** ({time_of_day['hour']:02d}:{time_of_day['minute']:02d})",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="📅 Game Calendar",
+            value=f"Day **{calendar['day_of_season']}** of **{calendar['season']}**, Year **{calendar['year']}**",
+            inline=False
+        )
+        
+        embed.add_field(
+            name="🌍 Real World",
+            value=(
+                f"{real_now.strftime('%B %d, %Y at %I:%M %p %Z')}\n"
+                f"Hemisphere: {self.conf.hemisphere.title()}ern"
+            ),
+            inline=False
+        )
+        
+        embed.set_footer(text="You can adjust time settings later with fishset gametime")
+        return embed
+    
+    def get_game_enable_embed(self) -> discord.Embed:
+        """Generate game enable embed."""
+        status = "🟢 Enabled" if self.conf.is_game_enabled else "🔴 Disabled"
+        
+        embed = discord.Embed(
+            title="🎮 Step 4/5: Enable the Game",
+            description=(
+                f"**Current status:** {status}\n\n"
+                "Would you like to enable Greenacres Fishing for your server?"
+            ),
+            color=discord.Color.blue()
+        )
+        return embed
+    
+    async def get_conversion_embed(self) -> discord.Embed:
+        """Generate currency conversion embed."""
+        currency_name = await bank.get_currency_name(self.ctx.guild)
+        status = "🟢 Enabled" if self.conf.discord_currency_conversion_enabled else "🔴 Disabled"
+        
+        embed = discord.Embed(
+            title="💱 Step 5/5: Currency Conversion",
+            description=(
+                f"**Current status:** {status}\n\n"
+                f"This feature allows players to convert FishPoints ↔ {currency_name}.\n\n"
+                "Would you like to enable currency conversion?"
+            ),
+            color=discord.Color.blue()
+        )
+        return embed
+    
+    async def get_rate_embed(self) -> discord.Embed:
+        """Generate conversion rate embed."""
+        currency_name = await bank.get_currency_name(self.ctx.guild)
+        
+        embed = discord.Embed(
+            title="⚙️ Set Conversion Rate",
+            description=(
+                f"**Current rate:** {self.conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}\n\n"
+                f"The default rate is 100 FP = 1 {currency_name}.\n\n"
+                "Would you like to set a custom rate?"
+            ),
+            color=discord.Color.blue()
+        )
+        embed.set_footer(text="If setting custom rate, type the number of FP per 1 currency in chat")
+        return embed
+    
+    async def get_complete_embed(self) -> discord.Embed:
+        """Generate setup complete embed."""
+        currency_name = await bank.get_currency_name(self.ctx.guild)
+        
+        embed = discord.Embed(
+            title="🎣 Setup Complete!",
+            color=discord.Color.green()
+        )
+        
+        embed.add_field(
+            name="Configuration Summary",
+            value=(
+                f"• Game: {'🟢 Enabled' if self.conf.is_game_enabled else '🔴 Disabled'}\n"
+                f"• Timezone: `{self.conf.timezone}`\n"
+                f"• Hemisphere: `{self.conf.hemisphere.title()}ern`\n"
+                f"• Currency Conversion: {'🟢 Enabled' if self.conf.discord_currency_conversion_enabled else '🔴 Disabled'}\n"
+                f"• Conversion Rate: {self.conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}"
+            ),
+            inline=False
+        )
+        
+        embed.add_field(
+            name="What's Next?",
+            value="Players can now use the `fish` command to start playing!",
+            inline=False
+        )
+        
+        return embed
+    
+    # Button callbacks
+    async def _start_setup(self, interaction: discord.Interaction):
+        """Start the setup process."""
+        self.current_step = "timezone"
+        self.awaiting_timezone = True
+        self._setup_timezone_buttons()
+        await interaction.response.edit_message(embed=self.get_timezone_embed(), view=self)
+        
+        # Start listening for timezone input
+        asyncio.create_task(self._listen_for_timezone())
+    
+    async def _cancel_setup(self, interaction: discord.Interaction):
+        """Cancel setup."""
+        embed = discord.Embed(
+            title="❌ Setup Cancelled",
+            description="You can run `fishsetup` again anytime to configure the game.",
+            color=discord.Color.red()
+        )
+        self.stop()
+        await interaction.response.edit_message(embed=embed, view=None)
+    
+    async def _show_timezone_help(self, interaction: discord.Interaction):
+        """Show timezone browser."""
+        view = TimezoneRegionView(author=self.ctx.author)
+        await interaction.response.send_message(embed=view._get_continent_embed(), view=view, ephemeral=True)
+    
+    async def _skip_timezone(self, interaction: discord.Interaction):
+        """Skip timezone step."""
+        self.awaiting_timezone = False
+        await self._proceed_to_hemisphere(interaction)
+    
+    async def _listen_for_timezone(self):
+        """Listen for timezone input in chat."""
+        def check(m: discord.Message) -> bool:
+            return m.author.id == self.ctx.author.id and m.channel.id == self.ctx.channel.id
+        
+        while self.awaiting_timezone and not self.is_finished():
+            try:
+                msg = await self.cog.bot.wait_for("message", check=check, timeout=120.0)
+                timezone_input = msg.content.strip()
+                
+                # Case-insensitive check
+                matching_tz = None
+                for tz in available_timezones():
+                    if tz.lower() == timezone_input.lower():
+                        matching_tz = tz
+                        break
+                
+                if matching_tz:
+                    self.conf.timezone = matching_tz
+                    self.cog.save()
+                    self.awaiting_timezone = False
+                    
+                    # Send confirmation and proceed
+                    await self.ctx.send(f"✅ Timezone set to **{matching_tz}**")
+                    self._setup_hemisphere_buttons()
+                    await self.message.edit(embed=self.get_hemisphere_embed(), view=self)
+                    break
+                else:
+                    # Ask them to try again
+                    await self.ctx.send(
+                        f"❌ `{timezone_input}` is not a recognized timezone.\n"
+                        "Please try again or click **View Timezones** to browse available options."
+                    )
+            except asyncio.TimeoutError:
+                if self.awaiting_timezone:
+                    self.awaiting_timezone = False
+                    embed = discord.Embed(
+                        title="⏰ Setup Timed Out",
+                        description="Run `fishsetup` again to continue.",
+                        color=discord.Color.red()
+                    )
+                    await self.message.edit(embed=embed, view=None)
+                    self.stop()
+                break
+    
+    async def _proceed_to_hemisphere(self, interaction: discord.Interaction):
+        """Move to hemisphere step."""
+        self.current_step = "hemisphere"
+        self._setup_hemisphere_buttons()
+        await interaction.response.edit_message(embed=self.get_hemisphere_embed(), view=self)
+    
+    async def _select_hemisphere_north(self, interaction: discord.Interaction):
+        """Select northern hemisphere."""
+        self.conf.hemisphere = "north"
+        self.cog.save()
+        await self._proceed_to_game_time(interaction)
+    
+    async def _select_hemisphere_south(self, interaction: discord.Interaction):
+        """Select southern hemisphere."""
+        self.conf.hemisphere = "south"
+        self.cog.save()
+        await self._proceed_to_game_time(interaction)
+    
+    async def _skip_hemisphere(self, interaction: discord.Interaction):
+        """Skip hemisphere step."""
+        await self._proceed_to_game_time(interaction)
+    
+    async def _proceed_to_game_time(self, interaction: discord.Interaction):
+        """Show game time preview."""
+        self.current_step = "game_time"
+        self._setup_game_enable_buttons()
+        await interaction.response.edit_message(embed=self.get_game_time_embed(), view=self)
+    
+    async def _enable_game(self, interaction: discord.Interaction):
+        """Enable the game."""
+        self.conf.is_game_enabled = True
+        self.cog.save()
+        await self._proceed_to_conversion(interaction)
+    
+    async def _disable_game(self, interaction: discord.Interaction):
+        """Keep game disabled."""
+        self.conf.is_game_enabled = False
+        self.cog.save()
+        await self._proceed_to_conversion(interaction)
+    
+    async def _proceed_to_conversion(self, interaction: discord.Interaction):
+        """Move to conversion step."""
+        self.current_step = "conversion"
+        self._setup_conversion_buttons()
+        await interaction.response.edit_message(embed=await self.get_conversion_embed(), view=self)
+    
+    async def _enable_conversion(self, interaction: discord.Interaction):
+        """Enable currency conversion."""
+        self.conf.discord_currency_conversion_enabled = True
+        self.cog.save()
+        await self._proceed_to_rate(interaction)
+    
+    async def _disable_conversion(self, interaction: discord.Interaction):
+        """Disable currency conversion."""
+        self.conf.discord_currency_conversion_enabled = False
+        self.cog.save()
+        await self._complete_setup(interaction)
+    
+    async def _proceed_to_rate(self, interaction: discord.Interaction):
+        """Move to rate step."""
+        self.current_step = "rate"
+        self._setup_rate_buttons()
+        await interaction.response.edit_message(embed=await self.get_rate_embed(), view=self)
+    
+    async def _set_custom_rate(self, interaction: discord.Interaction):
+        """Set custom conversion rate."""
+        self.awaiting_rate = True
+        currency_name = await bank.get_currency_name(self.ctx.guild)
+        
+        embed = await self.get_rate_embed()
+        embed.description += f"\n\n⏰ **Waiting for rate input...**\nType the number of FP per 1 {currency_name}"
+        
+        await interaction.response.edit_message(embed=embed, view=self)
+        asyncio.create_task(self._listen_for_rate())
+    
+    async def _listen_for_rate(self):
+        """Listen for conversion rate input."""
+        def check(m: discord.Message) -> bool:
+            return m.author.id == self.ctx.author.id and m.channel.id == self.ctx.channel.id
+        
+        currency_name = await bank.get_currency_name(self.ctx.guild)
+        
+        try:
+            msg = await self.cog.bot.wait_for("message", check=check, timeout=120.0)
+            try:
+                rate = int(msg.content.strip())
+                if rate <= 0:
+                    await self.ctx.send(f"⚠️ Invalid rate. Keeping default of **{self.conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}**.")
+                else:
+                    self.conf.discord_currency_conversion_rate = rate
+                    self.cog.save()
+                    await self.ctx.send(f"✅ Conversion rate set to **{rate:,} FP = 1 {currency_name}**")
+            except ValueError:
+                await self.ctx.send(f"⚠️ Invalid number. Keeping default of **{self.conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}**.")
+            
+            self.awaiting_rate = False
+            await self.message.edit(embed=await self.get_complete_embed(), view=None)
+            self.stop()
+        except asyncio.TimeoutError:
+            if self.awaiting_rate:
+                self.awaiting_rate = False
+                await self.ctx.send(f"⏰ Timed out. Keeping default rate.")
+                await self.message.edit(embed=await self.get_complete_embed(), view=None)
+                self.stop()
+    
+    async def _keep_default_rate(self, interaction: discord.Interaction):
+        """Keep default conversion rate."""
+        await self._complete_setup(interaction)
+    
+    async def _complete_setup(self, interaction: discord.Interaction):
+        """Complete the setup."""
+        self.current_step = "complete"
+        await interaction.response.edit_message(embed=await self.get_complete_embed(), view=None)
+        self.stop()
+
+
 class Admin(MixinMeta):
     @commands.command(name="fishsetup")
     @commands.admin_or_permissions(administrator=True)
@@ -436,261 +950,11 @@ class Admin(MixinMeta):
         """Walk through the initial setup for Greenacres Fishing."""
         conf = self.db.get_conf(ctx.guild)
         
-        def check(m: discord.Message) -> bool:
-            return m.author.id == ctx.author.id and m.channel.id == ctx.channel.id
-        
-        # Step 1: Timezone
-        await ctx.send(
-            "🎣 **Greenacres Fishing Setup**\n\n"
-            "**Step 1/3: Timezone**\n"
-            f"Current timezone: `{conf.timezone}`\n\n"
-            "Please enter your server's timezone (e.g., `America/New_York`, `Europe/London`, `UTC`).\n"
-            "Type `help` to see all available timezones, or `skip` to keep the current setting."
-        )
-        
-        # Timezone input loop (allows help to be shown and then continue)
-        timezone_set = False
-        while not timezone_set:
-            try:
-                msg = await self.bot.wait_for("message", check=check, timeout=120.0)
-                user_input = msg.content.strip().lower()
-                
-                if user_input == "help":
-                    # Show region-based timezone browser
-                    view = TimezoneRegionView(author=ctx.author)
-                    help_msg = await ctx.send(embed=view._get_continent_embed(), view=view)
-                    view.message = help_msg
-                    await view.wait()
-                    await ctx.send("Now enter your timezone choice:")
-                    continue  # Loop back to wait for timezone input
-                
-                elif user_input == "skip":
-                    await ctx.send(f"⏭️ Skipped. Timezone remains `{conf.timezone}`.")
-                    timezone_set = True
-                
-                else:
-                    timezone = msg.content.strip()  # Use original case for timezone
-                    if timezone in available_timezones():
-                        conf.timezone = timezone
-                        self.save()
-                        await ctx.send(f"✅ Timezone set to **{timezone}**")
-                        timezone_set = True
-                    else:
-                        # Try to find similar timezones
-                        matches = [tz for tz in available_timezones() if timezone.lower() in tz.lower()][:5]
-                        if matches:
-                            # Build numbered list for selection
-                            match_list = "\n".join(f"`{i+1}` - `{m}`" for i, m in enumerate(sorted(matches)))
-                            await ctx.send(
-                                f"⚠️ `{timezone}` is not a valid timezone. Did you mean one of these?\n\n"
-                                f"{match_list}\n\n"
-                                "Reply with the **number** of your choice, or type `utc` to use UTC."
-                            )
-                            
-                            try:
-                                tz_msg = await self.bot.wait_for("message", check=check, timeout=60.0)
-                                tz_response = tz_msg.content.strip().lower()
-                                
-                                if tz_response == "utc":
-                                    conf.timezone = "UTC"
-                                    self.save()
-                                    await ctx.send("✅ Timezone set to **UTC**")
-                                elif tz_response.isdigit():
-                                    choice = int(tz_response)
-                                    sorted_matches = sorted(matches)
-                                    if 1 <= choice <= len(sorted_matches):
-                                        selected_tz = sorted_matches[choice - 1]
-                                        conf.timezone = selected_tz
-                                        self.save()
-                                        await ctx.send(f"✅ Timezone set to **{selected_tz}**")
-                                    else:
-                                        await ctx.send(f"⚠️ Invalid choice. Keeping `{conf.timezone}`.")
-                                else:
-                                    await ctx.send(f"⚠️ Invalid response. Keeping `{conf.timezone}`.")
-                            except asyncio.TimeoutError:
-                                await ctx.send(f"⏰ Timed out. Keeping `{conf.timezone}`.")
-                        else:
-                            # No matches found, offer UTC
-                            await ctx.send(
-                                f"⚠️ `{timezone}` is not a valid timezone and no similar matches found.\n"
-                                "Would you like to use `UTC`? Reply with `yes` or `no`."
-                            )
-                            
-                            try:
-                                utc_msg = await self.bot.wait_for("message", check=check, timeout=60.0)
-                                if utc_msg.content.strip().lower() in ("yes", "y"):
-                                    conf.timezone = "UTC"
-                                    self.save()
-                                    await ctx.send("✅ Timezone set to **UTC**")
-                                else:
-                                    await ctx.send(f"⏭️ Keeping `{conf.timezone}`.")
-                            except asyncio.TimeoutError:
-                                await ctx.send(f"⏰ Timed out. Keeping `{conf.timezone}`.")
-                        timezone_set = True
-                        
-            except asyncio.TimeoutError:
-                await ctx.send("⏰ Setup timed out. Run `fishsetup` again to continue.")
-                return
-        
-        # Step 2: Hemisphere
-        await ctx.send(
-            "**Step 2/3: Hemisphere**\n"
-            f"Current hemisphere: `{conf.hemisphere}`\n\n"
-            "This affects season calculation. Enter `north` or `south`.\n"
-            "Or type `skip` to keep the current setting."
-        )
-        
-        try:
-            msg = await self.bot.wait_for("message", check=check, timeout=120.0)
-            if msg.content.lower() != "skip":
-                hemisphere = msg.content.strip().lower()
-                if hemisphere in ("north", "south"):
-                    conf.hemisphere = hemisphere
-                    self.save()
-                    await ctx.send(f"✅ Hemisphere set to **{hemisphere.title()}ern Hemisphere**")
-                else:
-                    await ctx.send(f"⚠️ Invalid hemisphere. Keeping `{conf.hemisphere}`.")
-            else:
-                await ctx.send(f"⏭️ Skipped. Hemisphere remains `{conf.hemisphere}`.")
-        except asyncio.TimeoutError:
-            await ctx.send("⏰ Setup timed out. Run `fishsetup` again to continue.")
-            return
-        
-        # Step 3: Show game time info
-        from .helper_functions import get_game_calendar, get_game_time_of_day
-        
-        calendar = get_game_calendar(self.db, ctx.guild)
-        time_of_day = get_game_time_of_day(self.db, ctx.guild)
-        tz = ZoneInfo(conf.timezone)
-        real_now = datetime.now(tz)
-        
-        await ctx.send(
-            "**Step 3/3: Game Time Preview**\n\n"
-            f"**🎮 Game Time**\n"
-            f"{time_of_day['emoji']} **{time_of_day['name']}** ({time_of_day['hour']:02d}:{time_of_day['minute']:02d})\n\n"
-            f"**📅 Game Calendar**\n"
-            f"Day **{calendar['day_of_season']}** of **{calendar['season']}**, Year **{calendar['year']}**\n\n"
-            f"**🌍 Real World**\n"
-            f"{real_now.strftime('%B %d, %Y at %I:%M %p %Z')}\n"
-            f"Hemisphere: {conf.hemisphere.title()}ern\n\n"
-            "You can adjust time settings later with `fishset gametime`."
-        )
-        
-        # Final step: Enable the game
-        status = "🟢 Enabled" if conf.is_game_enabled else "🔴 Disabled"
-        await ctx.send(
-            "**Enable the Game?**\n"
-            f"Current status: {status}\n\n"
-            "Would you like to enable Greenacres Fishing?\n"
-            "Reply with `yes`, `on`, or `enable` to enable.\n"
-            "Reply with `no`, `off`, or `disable` to keep it disabled."
-        )
-        
-        try:
-            msg = await self.bot.wait_for("message", check=check, timeout=120.0)
-            response = msg.content.strip().lower()
-            
-            if response in ("yes", "on", "enable"):
-                conf.is_game_enabled = True
-                self.save()
-                await ctx.send("✅ **Greenacres Fishing is now ENABLED!**")
-            elif response in ("no", "off", "disable"):
-                conf.is_game_enabled = False
-                self.save()
-                await ctx.send("🔴 **Greenacres Fishing remains DISABLED.**")
-            else:
-                await ctx.send(f"⚠️ Unrecognized response. Game status unchanged ({status}).")
-        except asyncio.TimeoutError:
-            await ctx.send("⏰ Setup timed out. Game status unchanged. Run `fishsetup` again to continue.")
-            return
-        
-        # Currency Conversion Setup
-        currency_name = await bank.get_currency_name(ctx.guild)
-        conv_status = "🟢 Enabled" if conf.discord_currency_conversion_enabled else "🔴 Disabled"
-        await ctx.send(
-            "**💱 Discord Currency Conversion**\n"
-            f"Current status: {conv_status}\n\n"
-            f"This feature allows players to convert FishPoints ↔ {currency_name}.\n\n"
-            "Would you like to enable currency conversion?\n"
-            "Reply with `yes` to enable, or `no` to disable."
-        )
-        
-        try:
-            msg = await self.bot.wait_for("message", check=check, timeout=120.0)
-            response = msg.content.strip().lower()
-            
-            if response in ("yes", "y"):
-                conf.discord_currency_conversion_enabled = True
-                self.save()
-                await ctx.send(f"✅ Currency conversion **enabled**!")
-                
-                # Ask about conversion rate
-                await ctx.send(
-                    "**Set Conversion Rate?**\n"
-                    f"Current rate: **{conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}**\n\n"
-                    f"The default rate is 100 FP = 1 {currency_name}.\n"
-                    "Would you like to set a custom rate?\n"
-                    "Reply with `yes` to set a custom rate, or `no` to keep the default."
-                )
-                
-                try:
-                    msg = await self.bot.wait_for("message", check=check, timeout=120.0)
-                    rate_response = msg.content.strip().lower()
-                    
-                    if rate_response in ("yes", "y"):
-                        await ctx.send(
-                            "Enter the conversion rate (FishPoints per 1 Discord currency).\n"
-                            "For example, enter `100` for 100 FP = 1 Discord currency.\n"
-                            "Enter `50` for 50 FP = 1 Discord currency."
-                        )
-                        
-                        try:
-                            msg = await self.bot.wait_for("message", check=check, timeout=120.0)
-                            try:
-                                rate = int(msg.content.strip())
-                                if rate <= 0:
-                                    await ctx.send(f"⚠️ Invalid rate. Keeping default of **{conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}**.")
-                                else:
-                                    conf.discord_currency_conversion_rate = rate
-                                    self.save()
-                                    await ctx.send(f"✅ Conversion rate set to **{rate:,} FP = 1 {currency_name}**")
-                            except ValueError:
-                                await ctx.send(f"⚠️ Invalid number. Keeping default of **{conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}**.")
-                        except asyncio.TimeoutError:
-                            await ctx.send(f"⏰ Timed out. Keeping default of **{conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}**.")
-                    else:
-                        await ctx.send(
-                            f"✅ Keeping default rate of **{conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}**.\n"
-                            "You can change this anytime with `fishset setrate <amount>`."
-                        )
-                except asyncio.TimeoutError:
-                    await ctx.send(
-                        f"⏰ Timed out. Keeping default rate of **{conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}**.\n"
-                        "You can change this anytime with `fishset setrate <amount>`."
-                    )
-                    
-            elif response in ("no", "n"):
-                conf.discord_currency_conversion_enabled = False
-                self.save()
-                await ctx.send(
-                    "🔴 Currency conversion **disabled**.\n"
-                    "You can enable it anytime with `fishset conversion on`."
-                )
-            else:
-                await ctx.send(f"⚠️ Unrecognized response. Currency conversion status unchanged ({conv_status}).")
-        except asyncio.TimeoutError:
-            await ctx.send("⏰ Timed out. Currency conversion status unchanged.")
-        
-        # Final setup complete message
-        await ctx.send(
-            "🎣 **Setup Complete!**\n\n"
-            f"• Game: {'🟢 Enabled' if conf.is_game_enabled else '🔴 Disabled'}\n"
-            f"• Timezone: `{conf.timezone}`\n"
-            f"• Hemisphere: `{conf.hemisphere.title()}ern`\n"
-            f"• Currency Conversion: {'🟢 Enabled' if conf.discord_currency_conversion_enabled else '🔴 Disabled'}\n"
-            f"• Conversion Rate: {conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}\n\n"
-            "Players can now use the `fish` command to start playing!"
-        )
+        # Create the setup view
+        setup_view = FishSetupView(cog=self, ctx=ctx, conf=conf)
+        embed = setup_view.get_welcome_embed()
+        message = await ctx.send(embed=embed, view=setup_view)
+        setup_view.message = message
 
     @commands.group(name="fishset", aliases=["fset"])
     @commands.admin_or_permissions(administrator=True)
