@@ -49,7 +49,7 @@ class User(MixinMeta):
             view.message = message
         else:
             # Show main menu for returning players
-            embed = await create_main_menu_embed(self, ctx.guild, ctx.author)
+            embed = await create_main_menu_embed(self, ctx.guild, ctx.author, ctx.prefix)
             view = MainMenuView(cog=self, author=ctx.author)
             message = await ctx.send(embed=embed, view=view)
             view.message = message
