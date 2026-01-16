@@ -7,16 +7,15 @@ from redbot.core.data_manager import cog_data_path
 
 from .abc import CompositeMetaClass
 from .common.commands import Commands
+from .common.gamemodes import GameModes  # Add import for GameModes
 from .common.models import DB
-from .common.leaderboard import Leaderboard  # Added import
-from .listeners import Listeners
-from .tasks import TaskLoops
+from .common.leaderboard import Leaderboard
 
 log = logging.getLogger("red.rroulette")
 
 
 class Russian(
-    Commands, Listeners, TaskLoops, Leaderboard, commands.Cog, metaclass=CompositeMetaClass  # Added Leaderboard
+    Commands, GameModes, Leaderboard, commands.Cog, metaclass=CompositeMetaClass  # Added GameModes
 ):
     """A game of chance where players risk it all for rewards"""
 

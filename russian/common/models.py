@@ -61,7 +61,6 @@ class User(Base):
             self.total_amount_lost += amount
         elif outcome == "challenge":
             self.player_total_challenges += 1
-            # Remove the financial tracking here - no loss if challenge isn't accepted
         elif outcome == "rejection":
             self.player_total_rejections += 1
 
@@ -71,7 +70,7 @@ class GuildSettings(Base):
     
     # Russian Roulette settings
     min_bet: int = 100
-    max_bet: int = 1000
+    max_bet: int = 3000
     token_to_discord_ratio: int = 500 # How many tokens equal 1 discord credit
 
     token_mode_enabled: bool = False  # Whether token mode is enabled
