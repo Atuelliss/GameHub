@@ -436,6 +436,16 @@ class User(MixinMeta):
             
             self.save()
             
+            # Economy Achievements
+            if user_conf.total_dinocoins_earned >= 1000:
+                await self.check_achievement(user_conf, "earn_1000", ctx)
+            if user_conf.total_dinocoins_earned >= 10000:
+                await self.check_achievement(user_conf, "earn_10000", ctx)
+            if user_conf.buddy_bonus_total_gained >= 100:
+                await self.check_achievement(user_conf, "buddy_bonus_100", ctx)
+            if user_conf.buddy_bonus_total_gained >= 500:
+                await self.check_achievement(user_conf, "buddy_bonus_500", ctx)
+            
             embed.title = "Sale Complete"
             if bonus_amount > 0:
                 embed.description = (
@@ -773,7 +783,10 @@ class User(MixinMeta):
             
             # Achievements
             if trade_type == "free":
+                sender_conf.total_gifts_given += 1
                 await self.check_achievement(sender_conf, "first_gift", ctx)
+                if sender_conf.total_gifts_given >= 5:
+                    await self.check_achievement(sender_conf, "gift_5", ctx)
             else:
                 await self.check_achievement(sender_conf, "first_trade", ctx)
             
@@ -984,6 +997,9 @@ class User(MixinMeta):
             user_conf.has_spent_dinocoins += dinocoins_to_deduct
             user_conf.total_converted_dinocoin += dinocoins_to_deduct
             self.save()
+            
+            # Achievement for first conversion
+            await self.check_achievement(user_conf, "convert_first", ctx)
             
             try:
                 await bank.deposit_credits(ctx.author, currency_to_receive)
