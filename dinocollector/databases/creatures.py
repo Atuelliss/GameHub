@@ -83,7 +83,7 @@ creature_library = {
         "version": "core",
         "rarity": "uncommon",
         "value": uncommon_value,
-        "image": "https://www.dododex.com/media/creature/arthropleura.png"
+        "image": "https://www.dododex.com/media/creature/arthropluera.png"
     },
     "astrocetus": {
         "name": "Astrocetus",

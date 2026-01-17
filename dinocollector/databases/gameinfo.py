@@ -156,5 +156,3 @@ def select_random_creature(event_mode_enabled=False, event_active_type="", force
     }
     
     return embed, creature_data
-
-

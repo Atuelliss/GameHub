@@ -114,5 +114,86 @@ achievement_library = {
         "description": "Gave away 5 dinos for free!",
         "reward": 150,
         "hint": "Sharing is caring!"
+    },
+    # Rarity Achievements
+    "first_legendary": {
+        "name": "Living Legend",
+        "description": "Captured your first Legendary Dinosaur!",
+        "reward": 200,
+        "hint": "Only the rarest of the rare."
+    },
+    "first_super_rare": {
+        "name": "Super Collector",
+        "description": "Captured your first Super Rare Dinosaur!",
+        "reward": 100,
+        "hint": "Keep hunting for the elusive ones."
+    },
+    "first_event": {
+        "name": "Festive Spirit",
+        "description": "Captured your first Event Dinosaur!",
+        "reward": 150,
+        "hint": "Celebrate the season!"
+    },
+    # Modifier Achievements
+    "first_aberrant": {
+        "name": "Strange Discovery",
+        "description": "Captured your first Aberrant Dinosaur!",
+        "reward": 50,
+        "hint": "Something seems... different."
+    },
+    "first_muscular": {
+        "name": "Gym Enthusiast",
+        "description": "Captured your first Muscular Dinosaur!",
+        "reward": 25,
+        "hint": "This one's been hitting the gym!"
+    },
+    "first_sickly": {
+        "name": "Nurturing Soul",
+        "description": "Captured your first Sickly Dinosaur!",
+        "reward": 25,
+        "hint": "Even the weak need a home."
+    },
+    # Milestone Achievements
+    "catch_10": {
+        "name": "Getting Started",
+        "description": "Caught 10 dinosaurs!",
+        "reward": 50,
+        "hint": "Keep catching!"
+    },
+    "catch_50": {
+        "name": "Experienced Hunter",
+        "description": "Caught 50 dinosaurs!",
+        "reward": 100,
+        "hint": "You're getting good at this!"
+    },
+    "catch_100": {
+        "name": "Dino Master",
+        "description": "Caught 100 dinosaurs!",
+        "reward": 250,
+        "hint": "A true hunter emerges."
+    },
+    "catch_500": {
+        "name": "Jurassic Legend",
+        "description": "Caught 500 dinosaurs!",
+        "reward": 500,
+        "hint": "You are legendary!"
+    },
+    "sell_50": {
+        "name": "Businessperson",
+        "description": "Sold 50 dinosaurs!",
+        "reward": 100,
+        "hint": "Making some coin!"
+    },
+    "sell_100": {
+        "name": "Dino Dealer",
+        "description": "Sold 100 dinosaurs!",
+        "reward": 250,
+        "hint": "A real entrepreneur."
+    },
+    "trade_10": {
+        "name": "Social Butterfly",
+        "description": "Completed 10 trades!",
+        "reward": 150,
+        "hint": "Trading is fun!"
     }
 }

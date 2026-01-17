@@ -446,6 +446,12 @@ class User(MixinMeta):
             if user_conf.buddy_bonus_total_gained >= 500:
                 await self.check_achievement(user_conf, "buddy_bonus_500", ctx)
             
+            # Sell milestone achievements
+            if user_conf.total_ever_sold >= 50:
+                await self.check_achievement(user_conf, "sell_50", ctx)
+            if user_conf.total_ever_sold >= 100:
+                await self.check_achievement(user_conf, "sell_100", ctx)
+            
             embed.title = "Sale Complete"
             if bonus_amount > 0:
                 embed.description = (
@@ -811,6 +817,12 @@ class User(MixinMeta):
             # Update Stats
             sender_conf.total_ever_traded += 1
             recipient_conf.total_ever_traded += 1
+            
+            # Trade milestone achievements
+            if sender_conf.total_ever_traded >= 10:
+                await self.check_achievement(sender_conf, "trade_10", ctx)
+            if recipient_conf.total_ever_traded >= 10:
+                await self.check_achievement(recipient_conf, "trade_10", ctx)
             
             # Update Log for Recipient
             already_in_log = any(d.get("name") == dino_to_give["name"] for d in recipient_conf.explorer_log)

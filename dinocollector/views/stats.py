@@ -1,4 +1,5 @@
 import discord
+import math
 from redbot.core import commands
 from ..databases.achievements import achievement_library
 
@@ -10,13 +11,6 @@ class StatsView(discord.ui.View):
         self.cog = cog
         self.stats_embed = stats_embed
         self.message: discord.Message = None
-        
-        # We define buttons as methods decorated with @discord.ui.button, 
-        # so they are already in self.children.
-        # However, we want to toggle between them.
-        # The 'achievements_button' is added by default because of the decorator.
-        # The 'back_button' is also added by default.
-        # We should remove 'back_button' initially.
         
         self.remove_item(self.back_button)
         self.remove_item(self.prev_button)
@@ -45,62 +39,84 @@ class StatsView(discord.ui.View):
                 pass
 
     def update_ach_buttons(self):
-        if self.current_ach_page == 0:
-            self.prev_button.disabled = True
-            self.next_button.disabled = False
-        else:
-            self.prev_button.disabled = False
-            self.next_button.disabled = True
+        total_pages = len(self.ach_embeds)
+        self.prev_button.disabled = self.current_ach_page == 0
+        self.next_button.disabled = self.current_ach_page >= total_pages - 1
 
     @discord.ui.button(label="Achievements", emoji="🏆", style=discord.ButtonStyle.secondary)
     async def achievements_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Sync achievements
-        await self.cog.sync_achievements(self.ctx, self.target)
-
         conf = self.cog.db.get_conf(self.ctx.guild)
         user_conf = conf.get_user(self.target)
         
-        unlocked = user_conf.achievement_log
+        unlocked_log = user_conf.achievement_log
         total_achievements = len(achievement_library)
+        unlocked_ids = {ach["id"] for ach in unlocked_log if ach["id"] in achievement_library}
+        unlocked_count = len(unlocked_ids)
         
-        # --- Page 1: Unlocked ---
-        embed_unlocked = discord.Embed(title=f"Achievements: {self.target.display_name}", color=discord.Color.gold())
-        unlocked_desc = ""
-        count = 0
-        unlocked_ids = set()
+        # Build combined list: unlocked first (sorted by unlock time), then locked
+        achievement_entries = []
         
-        if unlocked:
-            sorted_log = sorted(unlocked, key=lambda x: x["timestamp"])
+        # Unlocked achievements (sorted by timestamp)
+        if unlocked_log:
+            sorted_log = sorted(unlocked_log, key=lambda x: x["timestamp"])
             for ach in sorted_log:
                 ach_id = ach["id"]
                 if ach_id in achievement_library:
-                    unlocked_ids.add(ach_id)
                     data = achievement_library[ach_id]
-                    unlocked_desc += f"**{data['name']}**\n{data['description']}\n\n"
-                    count += 1
+                    achievement_entries.append({
+                        "type": "unlocked",
+                        "name": data["name"],
+                        "text": data["description"]
+                    })
         
-        if not unlocked_desc:
-            unlocked_desc = "No achievements unlocked yet!"
-            
-        embed_unlocked.description = f"**Unlocked: {count}/{total_achievements}**\n\n{unlocked_desc}"
-        embed_unlocked.set_footer(text="Page 1/2: Unlocked Achievements")
-
-        # --- Page 2: Locked ---
-        embed_locked = discord.Embed(title=f"Achievements: {self.target.display_name}", color=discord.Color.greyple())
-        locked_desc = ""
-        
+        # Locked achievements
         for ach_id, data in achievement_library.items():
             if ach_id not in unlocked_ids:
                 hint = data.get("hint", "Keep playing to unlock this achievement.")
-                locked_desc += f"**???**\nHint: {hint}\n\n"
-                
-        if not locked_desc:
-            locked_desc = "All achievements unlocked! Congratulations!"
-            
-        embed_locked.description = f"**Locked Achievements**\n\n{locked_desc}"
-        embed_locked.set_footer(text="Page 2/2: Locked Achievements")
+                achievement_entries.append({
+                    "type": "locked",
+                    "name": "???",
+                    "text": f"Hint: {hint}"
+                })
         
-        self.ach_embeds = [embed_unlocked, embed_locked]
+        # Paginate with 15 entries per page
+        per_page = 15
+        total_pages = max(1, math.ceil(len(achievement_entries) / per_page))
+        
+        self.ach_embeds = []
+        for page_num in range(total_pages):
+            start = page_num * per_page
+            end = start + per_page
+            chunk = achievement_entries[start:end]
+            
+            # Determine embed color based on content
+            has_unlocked = any(e["type"] == "unlocked" for e in chunk)
+            has_locked = any(e["type"] == "locked" for e in chunk)
+            
+            if has_unlocked and has_locked:
+                color = discord.Color.blue()
+            elif has_unlocked:
+                color = discord.Color.gold()
+            else:
+                color = discord.Color.greyple()
+            
+            embed = discord.Embed(
+                title=f"🏆 Achievements: {self.target.display_name}",
+                color=color
+            )
+            
+            description = f"**Progress: {unlocked_count}/{total_achievements}**\n\n"
+            
+            for entry in chunk:
+                if entry["type"] == "unlocked":
+                    description += f"✅ **{entry['name']}**\n{entry['text']}\n\n"
+                else:
+                    description += f"🔒 **{entry['name']}**\n{entry['text']}\n\n"
+            
+            embed.description = description
+            embed.set_footer(text=f"Page {page_num + 1}/{total_pages}")
+            self.ach_embeds.append(embed)
+        
         self.current_ach_page = 0
         
         # Switch buttons
@@ -115,9 +131,10 @@ class StatsView(discord.ui.View):
 
     @discord.ui.button(label="<", style=discord.ButtonStyle.primary)
     async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.current_ach_page = 0
+        if self.current_ach_page > 0:
+            self.current_ach_page -= 1
         self.update_ach_buttons()
-        await interaction.response.edit_message(embed=self.ach_embeds[0], view=self)
+        await interaction.response.edit_message(embed=self.ach_embeds[self.current_ach_page], view=self)
 
     @discord.ui.button(label="Back to Stats", style=discord.ButtonStyle.secondary)
     async def back_button(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -131,6 +148,7 @@ class StatsView(discord.ui.View):
 
     @discord.ui.button(label=">", style=discord.ButtonStyle.primary)
     async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.current_ach_page = 1
+        if self.current_ach_page < len(self.ach_embeds) - 1:
+            self.current_ach_page += 1
         self.update_ach_buttons()
-        await interaction.response.edit_message(embed=self.ach_embeds[1], view=self)
+        await interaction.response.edit_message(embed=self.ach_embeds[self.current_ach_page], view=self)

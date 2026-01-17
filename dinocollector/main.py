@@ -208,6 +208,77 @@ class DinoCollector(
         if not is_unlocked("gift_5"):
             if user_conf.total_gifts_given >= 5:
                 newly_unlocked.append("gift_5")
+        
+        # 20. Living Legend (First Legendary)
+        if not is_unlocked("first_legendary"):
+            has_legendary = any(d.get("rarity", "").lower() == "legendary" for d in user_conf.current_dino_inv)
+            if has_legendary:
+                newly_unlocked.append("first_legendary")
+                
+        # 21. Super Collector (First Super Rare)
+        if not is_unlocked("first_super_rare"):
+            has_super_rare = any(d.get("rarity", "").lower() == "super_rare" for d in user_conf.current_dino_inv)
+            if has_super_rare:
+                newly_unlocked.append("first_super_rare")
+                
+        # 22. Festive Spirit (First Event)
+        if not is_unlocked("first_event"):
+            has_event = any(d.get("rarity", "").lower() == "event" for d in user_conf.current_dino_inv)
+            if has_event:
+                newly_unlocked.append("first_event")
+                
+        # 23. Strange Discovery (First Aberrant)
+        if not is_unlocked("first_aberrant"):
+            has_aberrant = any(d.get("modifier", "").lower() == "aberrant" for d in user_conf.current_dino_inv)
+            if has_aberrant:
+                newly_unlocked.append("first_aberrant")
+                
+        # 24. Gym Enthusiast (First Muscular)
+        if not is_unlocked("first_muscular"):
+            has_muscular = any(d.get("modifier", "").lower() == "muscular" for d in user_conf.current_dino_inv)
+            if has_muscular:
+                newly_unlocked.append("first_muscular")
+                
+        # 25. Nurturing Soul (First Sickly)
+        if not is_unlocked("first_sickly"):
+            has_sickly = any(d.get("modifier", "").lower() == "sickly" for d in user_conf.current_dino_inv)
+            if has_sickly:
+                newly_unlocked.append("first_sickly")
+        
+        # 26. Getting Started (Catch 10)
+        if not is_unlocked("catch_10"):
+            if user_conf.total_ever_claimed >= 10:
+                newly_unlocked.append("catch_10")
+                
+        # 27. Experienced Hunter (Catch 50)
+        if not is_unlocked("catch_50"):
+            if user_conf.total_ever_claimed >= 50:
+                newly_unlocked.append("catch_50")
+                
+        # 28. Dino Master (Catch 100)
+        if not is_unlocked("catch_100"):
+            if user_conf.total_ever_claimed >= 100:
+                newly_unlocked.append("catch_100")
+                
+        # 29. Jurassic Legend (Catch 500)
+        if not is_unlocked("catch_500"):
+            if user_conf.total_ever_claimed >= 500:
+                newly_unlocked.append("catch_500")
+                
+        # 30. Businessperson (Sell 50)
+        if not is_unlocked("sell_50"):
+            if user_conf.total_ever_sold >= 50:
+                newly_unlocked.append("sell_50")
+                
+        # 31. Dino Dealer (Sell 100)
+        if not is_unlocked("sell_100"):
+            if user_conf.total_ever_sold >= 100:
+                newly_unlocked.append("sell_100")
+                
+        # 32. Social Butterfly (Trade 10)
+        if not is_unlocked("trade_10"):
+            if user_conf.total_ever_traded >= 10:
+                newly_unlocked.append("trade_10")
                 
         if newly_unlocked:
             total_reward = 0
