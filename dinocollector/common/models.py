@@ -26,6 +26,7 @@ class User(Base):
     total_ever_claimed: int = 0
     total_ever_sold: int = 0
     total_ever_traded: int = 0
+    total_gifts_given: int = 0
     total_escaped: int = 0
     has_lure: bool = False
     last_lure_use: float = 0.0
