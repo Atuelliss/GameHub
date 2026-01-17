@@ -173,6 +173,41 @@ class DinoCollector(
         if not is_unlocked("first_buddy"):
             if user_conf.buddy_dino:
                 newly_unlocked.append("first_buddy")
+        
+        # 13. Coin Collector (Earned 1,000 DinoCoins)
+        if not is_unlocked("earn_1000"):
+            if user_conf.total_dinocoins_earned >= 1000:
+                newly_unlocked.append("earn_1000")
+                
+        # 14. Dino Tycoon (Earned 10,000 DinoCoins)
+        if not is_unlocked("earn_10000"):
+            if user_conf.total_dinocoins_earned >= 10000:
+                newly_unlocked.append("earn_10000")
+                
+        # 15. Best Friends Forever (Buddy Bonus 100)
+        if not is_unlocked("buddy_bonus_100"):
+            if user_conf.buddy_bonus_total_gained >= 100:
+                newly_unlocked.append("buddy_bonus_100")
+                
+        # 16. Inseparable (Buddy Bonus 500)
+        if not is_unlocked("buddy_bonus_500"):
+            if user_conf.buddy_bonus_total_gained >= 500:
+                newly_unlocked.append("buddy_bonus_500")
+                
+        # 17. Currency Exchange (First Convert)
+        if not is_unlocked("convert_first"):
+            if user_conf.total_converted_dinocoin > 0:
+                newly_unlocked.append("convert_first")
+                
+        # 18. Big Spender (Spent 5,000 DinoCoins)
+        if not is_unlocked("spent_5000"):
+            if user_conf.has_spent_dinocoins >= 5000:
+                newly_unlocked.append("spent_5000")
+                
+        # 19. Philanthropist (Gift 5 dinos)
+        if not is_unlocked("gift_5"):
+            if user_conf.total_gifts_given >= 5:
+                newly_unlocked.append("gift_5")
                 
         if newly_unlocked:
             total_reward = 0
