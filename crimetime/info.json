@@ -1,0 +1,16 @@
+{
+  "author": ["Jayar", "Vertyco"],
+  "description": "A criminal mini-game cog for Red-DiscordBot.",
+  "disabled": false,
+  "end_user_data_statement": "",
+  "hidden": false,
+  "install_msg": "Thank you for installing!",
+  "min_bot_version": "3.5.3",
+  "min_python_version": [3, 10, 0],
+  "permissions": [],
+  "required_cogs": {},
+  "requirements": ["pydantic"],
+  "short": "We're Muggers!",
+  "tags": ["crime", "economy", "steal"],
+  "type": "COG"
+}
