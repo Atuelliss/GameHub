@@ -860,7 +860,7 @@ creature_library = {
         "version": "core",
         "rarity": "uncommon",
         "value": uncommon_value,
-        "image": "https://www.dododex.com/media/creature/paraceratherium.png"
+        "image": "https://www.dododex.com/media/creature/paracer.png"
     },
     "parasaur": {
         "name": "Parasaur",
