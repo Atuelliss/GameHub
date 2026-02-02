@@ -84,6 +84,8 @@ class Shop(MixinMeta):
             await self.check_achievement(user_conf, "max_upgrade", ctx)
         if user_conf.has_spent_dinocoins >= 5000:
             await self.check_achievement(user_conf, "spent_5000", ctx)
+        if user_conf.has_spent_dinocoins >= 25000:
+            await self.check_achievement(user_conf, "spent_25000", ctx)
 
     @dcshop_buy.command(name="lure")
     async def buy_lure(self, ctx: commands.Context):
@@ -113,5 +115,7 @@ class Shop(MixinMeta):
         await self.check_achievement(user_conf, "first_lure_purchase", ctx)
         if user_conf.has_spent_dinocoins >= 5000:
             await self.check_achievement(user_conf, "spent_5000", ctx)
+        if user_conf.has_spent_dinocoins >= 25000:
+            await self.check_achievement(user_conf, "spent_25000", ctx)
         
         await ctx.send(f"🥩 You bought a lure for **{price}** coins! Use `{ctx.prefix}dclure` to use it.")

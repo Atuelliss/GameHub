@@ -441,6 +441,8 @@ class User(MixinMeta):
                 await self.check_achievement(user_conf, "earn_1000", ctx)
             if user_conf.total_dinocoins_earned >= 10000:
                 await self.check_achievement(user_conf, "earn_10000", ctx)
+            if user_conf.total_dinocoins_earned >= 50000:
+                await self.check_achievement(user_conf, "earn_50000", ctx)
             if user_conf.buddy_bonus_total_gained >= 100:
                 await self.check_achievement(user_conf, "buddy_bonus_100", ctx)
             if user_conf.buddy_bonus_total_gained >= 500:
@@ -451,6 +453,8 @@ class User(MixinMeta):
                 await self.check_achievement(user_conf, "sell_50", ctx)
             if user_conf.total_ever_sold >= 100:
                 await self.check_achievement(user_conf, "sell_100", ctx)
+            if user_conf.total_ever_sold >= 250:
+                await self.check_achievement(user_conf, "sell_250", ctx)
             
             embed.title = "Sale Complete"
             if bonus_amount > 0:
@@ -639,6 +643,7 @@ class User(MixinMeta):
         # Consume Lure and Set Cooldown
         user_conf.has_lure = False
         user_conf.last_lure_use = now
+        user_conf.total_lures_used += 1
         self.save()
 
         # Trigger Spawn
@@ -646,6 +651,8 @@ class User(MixinMeta):
         
         # Achievements
         await self.check_achievement(user_conf, "first_lure_use", ctx)
+        if user_conf.total_lures_used >= 10:
+            await self.check_achievement(user_conf, "lure_10", ctx)
 
         result = select_random_creature(
             event_mode_enabled=conf.event_mode_enabled,
@@ -790,9 +797,16 @@ class User(MixinMeta):
             # Achievements
             if trade_type == "free":
                 sender_conf.total_gifts_given += 1
+                recipient_conf.total_gifts_received += 1
                 await self.check_achievement(sender_conf, "first_gift", ctx)
+                await self.check_achievement(recipient_conf, "receive_gift", ctx)
                 if sender_conf.total_gifts_given >= 5:
                     await self.check_achievement(sender_conf, "gift_5", ctx)
+                if sender_conf.total_gifts_given >= 10:
+                    await self.check_achievement(sender_conf, "gift_10", ctx)
+                # Check if gifting a legendary
+                if dino_to_give.get("rarity", "").lower() == "legendary":
+                    await self.check_achievement(sender_conf, "gift_legendary", ctx)
             else:
                 await self.check_achievement(sender_conf, "first_trade", ctx)
             
@@ -823,6 +837,10 @@ class User(MixinMeta):
                 await self.check_achievement(sender_conf, "trade_10", ctx)
             if recipient_conf.total_ever_traded >= 10:
                 await self.check_achievement(recipient_conf, "trade_10", ctx)
+            if sender_conf.total_ever_traded >= 25:
+                await self.check_achievement(sender_conf, "trade_25", ctx)
+            if recipient_conf.total_ever_traded >= 25:
+                await self.check_achievement(recipient_conf, "trade_25", ctx)
             
             # Update Log for Recipient
             already_in_log = any(d.get("name") == dino_to_give["name"] for d in recipient_conf.explorer_log)

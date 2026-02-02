@@ -2,6 +2,7 @@ import discord
 import time
 import random
 import asyncio
+from ..databases.creatures import creature_library
 
 class SpawnView(discord.ui.View):
     def __init__(self, cog, creature_data):
@@ -64,6 +65,10 @@ class SpawnView(discord.ui.View):
                 # Update stats
                 user_conf.total_escaped += 1
                 self.cog.save()
+                
+                # Escaped achievement
+                if user_conf.total_escaped >= 10:
+                    await self.cog.check_achievement(user_conf, "escaped_10", interaction)
                 
                 # Always show fled message
                 embed = self.message.embeds[0]
@@ -134,11 +139,20 @@ class SpawnView(discord.ui.View):
                 await self.cog.check_achievement(user_conf, "first_muscular", interaction)
             elif modifier == "sickly":
                 await self.cog.check_achievement(user_conf, "first_sickly", interaction)
+            elif modifier == "withered":
+                await self.cog.check_achievement(user_conf, "first_withered", interaction)
+            elif modifier == "young":
+                await self.cog.check_achievement(user_conf, "first_young", interaction)
+            elif modifier == "irradiated":
+                await self.cog.check_achievement(user_conf, "first_irradiated", interaction)
             
             # Rarity achievements
             rarity = self.creature_data.get("rarity", "").lower()
             if rarity == "legendary":
+                user_conf.total_legendary_caught += 1
                 await self.cog.check_achievement(user_conf, "first_legendary", interaction)
+                if user_conf.total_legendary_caught >= 5:
+                    await self.cog.check_achievement(user_conf, "catch_5_legendary", interaction)
             elif rarity == "super_rare":
                 await self.cog.check_achievement(user_conf, "first_super_rare", interaction)
             elif rarity == "event":
@@ -153,6 +167,22 @@ class SpawnView(discord.ui.View):
                 await self.cog.check_achievement(user_conf, "catch_100", interaction)
             if user_conf.total_ever_claimed >= 500:
                 await self.cog.check_achievement(user_conf, "catch_500", interaction)
+            if user_conf.total_ever_claimed >= 1000:
+                await self.cog.check_achievement(user_conf, "catch_1000", interaction)
+            
+            # Explorer log percentage achievements
+            total_species = len(creature_library)
+            caught_species = len(user_conf.explorer_log)
+            if total_species > 0:
+                percentage = (caught_species / total_species) * 100
+                if percentage >= 25:
+                    await self.cog.check_achievement(user_conf, "log_25_percent", interaction)
+                if percentage >= 50:
+                    await self.cog.check_achievement(user_conf, "log_50_percent", interaction)
+                if percentage >= 75:
+                    await self.cog.check_achievement(user_conf, "log_75_percent", interaction)
+                if percentage >= 100:
+                    await self.cog.check_achievement(user_conf, "log_100_percent", interaction)
                 
             # Check full inventory
             current_size = conf.base_inventory_size + (user_conf.current_inventory_upgrade_level * conf.inventory_per_upgrade)

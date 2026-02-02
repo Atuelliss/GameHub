@@ -279,6 +279,76 @@ class DinoCollector(
         if not is_unlocked("trade_10"):
             if user_conf.total_ever_traded >= 10:
                 newly_unlocked.append("trade_10")
+        
+        # === NEW ACHIEVEMENTS (16) ===
+        
+        # Explorer Log Achievements
+        total_species = len(creature_library)
+        caught_species = len(user_conf.explorer_log)
+        if total_species > 0:
+            percentage = (caught_species / total_species) * 100
+            if not is_unlocked("log_25_percent") and percentage >= 25:
+                newly_unlocked.append("log_25_percent")
+            if not is_unlocked("log_50_percent") and percentage >= 50:
+                newly_unlocked.append("log_50_percent")
+            if not is_unlocked("log_75_percent") and percentage >= 75:
+                newly_unlocked.append("log_75_percent")
+            if not is_unlocked("log_100_percent") and percentage >= 100:
+                newly_unlocked.append("log_100_percent")
+        
+        # Missing Modifier Achievements
+        if not is_unlocked("first_withered"):
+            has_withered = any(d.get("modifier", "").lower() == "withered" for d in user_conf.current_dino_inv)
+            if has_withered:
+                newly_unlocked.append("first_withered")
+        if not is_unlocked("first_young"):
+            has_young = any(d.get("modifier", "").lower() == "young" for d in user_conf.current_dino_inv)
+            if has_young:
+                newly_unlocked.append("first_young")
+        if not is_unlocked("first_irradiated"):
+            has_irradiated = any(d.get("modifier", "").lower() == "irradiated" for d in user_conf.current_dino_inv)
+            if has_irradiated:
+                newly_unlocked.append("first_irradiated")
+        
+        # Extended Milestones
+        if not is_unlocked("catch_1000"):
+            if user_conf.total_ever_claimed >= 1000:
+                newly_unlocked.append("catch_1000")
+        if not is_unlocked("escaped_10"):
+            if user_conf.total_escaped >= 10:
+                newly_unlocked.append("escaped_10")
+        if not is_unlocked("lure_10"):
+            if user_conf.total_lures_used >= 10:
+                newly_unlocked.append("lure_10")
+        
+        # Extended Economy
+        if not is_unlocked("earn_50000"):
+            if user_conf.total_dinocoins_earned >= 50000:
+                newly_unlocked.append("earn_50000")
+        if not is_unlocked("spent_25000"):
+            if user_conf.has_spent_dinocoins >= 25000:
+                newly_unlocked.append("spent_25000")
+        
+        # Extended Social
+        if not is_unlocked("receive_gift"):
+            if user_conf.total_gifts_received >= 1:
+                newly_unlocked.append("receive_gift")
+        if not is_unlocked("trade_25"):
+            if user_conf.total_ever_traded >= 25:
+                newly_unlocked.append("trade_25")
+        
+        # Legendary Collection
+        if not is_unlocked("catch_5_legendary"):
+            if user_conf.total_legendary_caught >= 5:
+                newly_unlocked.append("catch_5_legendary")
+        
+        # Extended Milestones (50 achievements)
+        if not is_unlocked("sell_250"):
+            if user_conf.total_ever_sold >= 250:
+                newly_unlocked.append("sell_250")
+        if not is_unlocked("gift_10"):
+            if user_conf.total_gifts_given >= 10:
+                newly_unlocked.append("gift_10")
                 
         if newly_unlocked:
             total_reward = 0

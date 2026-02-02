@@ -195,5 +195,120 @@ achievement_library = {
         "description": "Completed 10 trades!",
         "reward": 150,
         "hint": "Trading is fun!"
+    },
+    # Explorer Log Achievements
+    "log_25_percent": {
+        "name": "Novice Explorer",
+        "description": "Discovered 25% of all dinosaur species!",
+        "reward": 150,
+        "hint": "Fill your explorer log."
+    },
+    "log_50_percent": {
+        "name": "Seasoned Explorer",
+        "description": "Discovered 50% of all dinosaur species!",
+        "reward": 300,
+        "hint": "Halfway there!"
+    },
+    "log_75_percent": {
+        "name": "Expert Explorer",
+        "description": "Discovered 75% of all dinosaur species!",
+        "reward": 500,
+        "hint": "Almost complete!"
+    },
+    "log_100_percent": {
+        "name": "Master Paleontologist",
+        "description": "Discovered every dinosaur species!",
+        "reward": 1000,
+        "hint": "Gotta catch 'em all!"
+    },
+    # Missing Modifier Achievements
+    "first_withered": {
+        "name": "Time's Toll",
+        "description": "Captured your first Withered Dinosaur!",
+        "reward": 25,
+        "hint": "Age comes for us all."
+    },
+    "first_young": {
+        "name": "Nurturing Instinct",
+        "description": "Captured your first Young Dinosaur!",
+        "reward": 25,
+        "hint": "They grow up so fast!"
+    },
+    "first_irradiated": {
+        "name": "Nuclear Option",
+        "description": "Captured your first Irradiated Dinosaur!",
+        "reward": 50,
+        "hint": "Glowing with potential!"
+    },
+    # Extended Milestones
+    "catch_1000": {
+        "name": "Extinction Event",
+        "description": "Caught 1,000 dinosaurs!",
+        "reward": 1000,
+        "hint": "An unstoppable force!"
+    },
+    "escaped_10": {
+        "name": "Slippery Catch",
+        "description": "Had 10 dinosaurs escape from you!",
+        "reward": 50,
+        "hint": "Not every hunt succeeds."
+    },
+    "lure_10": {
+        "name": "Bait Master",
+        "description": "Used 10 lures!",
+        "reward": 200,
+        "hint": "Keep them coming!"
+    },
+    # Extended Economy Achievements
+    "earn_50000": {
+        "name": "Dino Millionaire",
+        "description": "Earned 50,000 DinoCoins total!",
+        "reward": 750,
+        "hint": "Swimming in coins!"
+    },
+    "spent_25000": {
+        "name": "Shop-a-holic",
+        "description": "Spent 25,000 DinoCoins in the shop!",
+        "reward": 500,
+        "hint": "The economy thanks you!"
+    },
+    # Extended Social Achievements
+    "gift_legendary": {
+        "name": "Ultimate Generosity",
+        "description": "Gifted a Legendary dinosaur to someone!",
+        "reward": 500,
+        "hint": "True selflessness!"
+    },
+    "trade_25": {
+        "name": "Deal Maker",
+        "description": "Completed 25 trades!",
+        "reward": 300,
+        "hint": "A trader's life for me!"
+    },
+    "receive_gift": {
+        "name": "Lucky Recipient",
+        "description": "Received a dinosaur as a gift!",
+        "reward": 50,
+        "hint": "Friends are the best!"
+    },
+    # Rarity Collection Achievement
+    "catch_5_legendary": {
+        "name": "Legendary Collector",
+        "description": "Caught 5 Legendary dinosaurs!",
+        "reward": 500,
+        "hint": "Fortune favors the bold!"
+    },
+    # Extended Milestones (to reach 50 achievements)
+    "sell_250": {
+        "name": "Dino Mogul",
+        "description": "Sold 250 dinosaurs!",
+        "reward": 400,
+        "hint": "A true business empire!"
+    },
+    "gift_10": {
+        "name": "Santa Claus",
+        "description": "Gave away 10 dinos for free!",
+        "reward": 250,
+        "hint": "Spreading joy everywhere!"
     }
 }
