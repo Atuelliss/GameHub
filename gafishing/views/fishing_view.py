@@ -1147,7 +1147,18 @@ class ActiveFishingView(BaseView):
                 self._hook_task.cancel()
                 self._hook_task = None
             
-            success, msg = attempt_set_hook(self.session)
+            # Get user data for spawn checking
+            conf = self.cog.db.get_conf(interaction.guild)
+            user_data = conf.get_user(self.author)
+            
+            # Track if there was a pending spawn before attempting hook
+            had_spawn = user_data and hasattr(user_data, 'pending_spawn') and user_data.pending_spawn is not None
+            
+            success, msg = attempt_set_hook(self.session, user_data)
+            
+            # Save if spawn was used (spawn was consumed)
+            if had_spawn:
+                self.cog.save()
             
             self._update_buttons()
             embed = await self.create_fishing_embed(interaction.guild)
@@ -1426,8 +1437,36 @@ class ActiveFishingView(BaseView):
             
             if landed:
                 # Fish is landed!
-                land_msg, is_record, earned_token = land_the_fish(self.session, user_data)
+                land_msg, is_record, earned_token, debug_info = land_the_fish(
+                    self.session, user_data, 
+                    debug_log=self.cog.debug_log, 
+                    user_obj=self.author
+                )
                 self.cog.save()
+                
+                # Send debug info if user has debug mode enabled
+                if user_data.debug_mode and debug_info:
+                    max_w = debug_info["max_weight_oz"]
+                    max_l = debug_info["max_length_in"]
+                    w = debug_info["weight_oz"]
+                    l = debug_info["length_in"]
+                    
+                    weight_status = "✅ MAX!" if debug_info["is_max_weight"] else f"({max_w - w:.1f} oz away)"
+                    length_status = "✅ MAX!" if debug_info["is_max_length"] else f"({max_l - l:.1f} in away)"
+                    
+                    debug_msg = (
+                        f"**🔍 Debug Info:**\n"
+                        f"Weight: {w} oz / {max_w} oz {weight_status}\n"
+                        f"Length: {l} in / {max_l} in {length_status}\n"
+                        f"Token Awarded: {'Yes ✅' if debug_info['earned_token'] else 'No'}\n"
+                        f"Perfect Trophy: {'Yes 🌟' if debug_info['earned_perfect_trophy'] else 'No'}\n"
+                        f"Total Tokens: {debug_info['total_tokens']}"
+                    )
+                    try:
+                        await interaction.followup.send(debug_msg, ephemeral=True)
+                    except:
+                        pass  # Don't break gameplay if debug message fails
+                        
             elif self.session.phase == FishingPhase.ESCAPED:
                 # Line snapped
                 snap_msg, rod_broke = handle_line_snap(self.session, user_data)

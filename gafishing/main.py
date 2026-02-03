@@ -26,9 +26,13 @@ class GreenacresFishing(
         super().__init__()
         self.bot: Red = bot
         self.db: DB = DB()
+        self.data_path = cog_data_path(self)  # Path to cog's data folder
 
         # States
         self._saving = False
+        
+        # In-memory debug log for fish catches (avoids writing to filesystem)
+        self.debug_log: list = []
         
         # Track active views so we can close them on reload
         self.active_views = set()

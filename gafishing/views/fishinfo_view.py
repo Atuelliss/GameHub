@@ -142,7 +142,7 @@ class ConvertFPModal(discord.ui.Modal):
         original_embed: discord.Embed,
         parent_view: FishInfoView,
         currency_name: str,
-        conversion_rate: int
+        conversion_rate: float
     ):
         super().__init__(title=f"Convert FP → {currency_name}")
         self.cog = cog
@@ -153,10 +153,16 @@ class ConvertFPModal(discord.ui.Modal):
         self.currency_name = currency_name
         self.conversion_rate = conversion_rate
         
-        # Create TextInput with dynamic placeholder
+        # Create TextInput with dynamic placeholder showing the rate
+        if conversion_rate >= 1:
+            rate_text = f"{conversion_rate:g} FP = 1 {currency_name}"
+        else:
+            # Rate < 1 means 1 FP = multiple currency
+            rate_text = f"1 FP = {1/conversion_rate:g} {currency_name}"
+        
         self.amount_input = discord.ui.TextInput(
             label="Amount of FishPoints to convert",
-            placeholder=f"Rate: {conversion_rate} FP = 1 {currency_name}",
+            placeholder=f"Rate: {rate_text}",
             min_length=1,
             max_length=10
         )
@@ -185,17 +191,34 @@ class ConvertFPModal(discord.ui.Modal):
             )
             return
         
-        # Check if amount is less than conversion rate
-        if amount < self.conversion_rate:
+        # Calculate conversion: FP / rate = currency
+        currency_to_receive_raw = amount / self.conversion_rate
+        currency_to_receive = int(currency_to_receive_raw)
+        
+        # Check if conversion would result in 0 currency
+        if currency_to_receive < 1:
+            # Calculate minimum FP needed for 1 currency
+            min_fp_needed = int(self.conversion_rate) if self.conversion_rate >= 1 else 1
+            if self.conversion_rate > 1 and self.conversion_rate != int(self.conversion_rate):
+                min_fp_needed = int(self.conversion_rate) + 1
+            # Recalculate to find exact minimum
+            min_fp_needed = max(1, int(self.conversion_rate) if self.conversion_rate == int(self.conversion_rate) else int(self.conversion_rate) + 1)
+            if min_fp_needed * 1 / self.conversion_rate < 1:
+                min_fp_needed = int(self.conversion_rate) + 1 if self.conversion_rate > 1 else 1
+            
+            # Simpler approach: find minimum FP that yields at least 1 currency
+            import math
+            min_fp_needed = math.ceil(self.conversion_rate)
+            
             await interaction.response.send_message(
-                f"❌ You need at least **{self.conversion_rate:,}** FP to convert (Rate: {self.conversion_rate} FP = 1 {self.currency_name}).",
+                f"❌ You need at least **{min_fp_needed:,}** FP to receive 1 {self.currency_name}.\n"
+                f"(Your {amount:,} FP would only convert to {currency_to_receive_raw:.2f} {self.currency_name})",
                 ephemeral=True
             )
             return
         
-        # Calculate conversion
-        currency_to_receive = amount // self.conversion_rate
-        fp_to_deduct = currency_to_receive * self.conversion_rate
+        # Calculate exact FP to deduct for whole currency amount
+        fp_to_deduct = int(currency_to_receive * self.conversion_rate)
         
         # Check if amount doesn't divide evenly
         if fp_to_deduct != amount:
@@ -269,7 +292,7 @@ class ConvertCurrencyModal(discord.ui.Modal):
         original_embed: discord.Embed,
         parent_view: FishInfoView,
         currency_name: str,
-        conversion_rate: int
+        conversion_rate: float
     ):
         super().__init__(title=f"Convert {currency_name} → FP")
         self.cog = cog
@@ -280,10 +303,16 @@ class ConvertCurrencyModal(discord.ui.Modal):
         self.currency_name = currency_name
         self.conversion_rate = conversion_rate
         
-        # Create TextInput with dynamic label and placeholder
+        # Create TextInput with dynamic label and placeholder showing the rate
+        if conversion_rate >= 1:
+            rate_text = f"1 {currency_name} = {conversion_rate:g} FP"
+        else:
+            # Rate < 1 means 1 FP = multiple currency, so invert for this direction
+            rate_text = f"{1/conversion_rate:g} {currency_name} = 1 FP"
+        
         self.amount_input = discord.ui.TextInput(
             label=f"Amount of {currency_name} to convert",
-            placeholder=f"Rate: 1 {currency_name} = {conversion_rate} FP",
+            placeholder=f"Rate: {rate_text}",
             min_length=1,
             max_length=10
         )
@@ -318,8 +347,68 @@ class ConvertCurrencyModal(discord.ui.Modal):
             )
             return
         
-        # Calculate conversion: 1 Discord currency = conversion_rate FP
-        fp_to_receive = amount * self.conversion_rate
+        # Calculate conversion: currency * rate = FP
+        fp_to_receive_raw = amount * self.conversion_rate
+        fp_to_receive = int(fp_to_receive_raw)
+        
+        # Check if conversion would result in 0 FP (rate < 1 scenario)
+        if fp_to_receive < 1:
+            # Calculate minimum currency needed for 1 FP
+            import math
+            min_currency_needed = math.ceil(1 / self.conversion_rate)
+            
+            await interaction.response.send_message(
+                f"❌ You need at least **{min_currency_needed:,}** {self.currency_name} to receive 1 FP.\n"
+                f"(Your {amount:,} {self.currency_name} would only convert to {fp_to_receive_raw:.2f} FP)",
+                ephemeral=True
+            )
+            return
+        
+        # Calculate exact currency to deduct for whole FP amount
+        currency_to_deduct = amount  # Deduct what they asked, give floored FP
+        
+        # Check if there's a fractional remainder
+        if fp_to_receive_raw != fp_to_receive:
+            # There's a remainder - inform user
+            import math
+            # Calculate what they'd need to spend for the next whole FP
+            next_whole_fp = fp_to_receive + 1
+            currency_for_next = math.ceil(next_whole_fp / self.conversion_rate)
+            
+            # Build rate text
+            if self.conversion_rate >= 1:
+                rate_text = f"1 {self.currency_name} = {self.conversion_rate:g} FP"
+            else:
+                rate_text = f"{1/self.conversion_rate:g} {self.currency_name} = 1 FP"
+            
+            confirm_view = ConvertConfirmView(
+                cog=self.cog,
+                author=self.author,
+                target=self.target,
+                original_embed=self.original_embed,
+                parent_view=self.parent_view,
+                conversion_type="currency_to_fp",
+                amount_to_deduct=amount,
+                amount_to_receive=fp_to_receive,
+                currency_name=self.currency_name,
+                conversion_rate=self.conversion_rate
+            )
+            
+            await interaction.response.send_message(
+                f"⚠️ Converting **{amount:,}** {self.currency_name} will give you **{fp_to_receive:,}** FP "
+                f"(not {fp_to_receive_raw:.2f}).\n"
+                f"To get **{next_whole_fp:,}** FP, you'd need **{currency_for_next:,}** {self.currency_name}.\n\n"
+                f"Do you wish to continue with {fp_to_receive:,} FP?",
+                view=confirm_view,
+                ephemeral=True
+            )
+            return
+        
+        # Build rate text for confirmation
+        if self.conversion_rate >= 1:
+            rate_text = f"1 {self.currency_name} = {self.conversion_rate:g} FP"
+        else:
+            rate_text = f"{1/self.conversion_rate:g} {self.currency_name} = 1 FP"
         
         # Show confirmation
         confirm_view = ConvertConfirmView(
@@ -337,7 +426,7 @@ class ConvertCurrencyModal(discord.ui.Modal):
         
         await interaction.response.send_message(
             f"💱 Convert **{amount:,}** {self.currency_name} into **{fp_to_receive:,}** FishPoints?\n\n"
-            f"(Rate: 1 {self.currency_name} = {self.conversion_rate} FP)",
+            f"(Rate: {rate_text})",
             view=confirm_view,
             ephemeral=True
         )
@@ -357,7 +446,7 @@ class ConvertConfirmView(discord.ui.View):
         amount_to_deduct: int,
         amount_to_receive: int,
         currency_name: str,
-        conversion_rate: int
+        conversion_rate: float
     ):
         super().__init__(timeout=60.0)
         self.cog = cog

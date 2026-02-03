@@ -14,6 +14,10 @@ class User(Base):
     current_fishmaster_tokens: int = 0 # Unique tokens obtained by catching the largest weight or length of a species of fish.
     most_fishmaster_tokens_ever: int = 0
     
+    # Admin/Debug features
+    debug_mode: bool = False  # If True, show debug info after catches and log to memory
+    pending_spawn: Optional[dict] = None  # Admin-spawned fish for next catch: {"fish_id": str, "weight": str, "length": str}
+    
     # Cooldowns (Unix timestamps)
     last_scavenge_timestamp: int = 0  # Last time player searched garbage (12hr cooldown)
     
@@ -167,7 +171,7 @@ class GuildSettings(Base):
 
     # Discord Currency Integration
     discord_currency_conversion_enabled: bool = False
-    discord_currency_conversion_rate: int = 100  # Number of Game Currency per Discord Currency unit
+    discord_currency_conversion_rate: float = 1.0  # Conversion rate: rate FP = 1 Discord currency (e.g., 0.5 means 1 FP = 2 currency)
 
     DEFAULT_DISALLOWED_NAMES: ClassVar[List[str]] = [
         "admin", "moderator", "owner", "system", "null", "nigger", "nigga", 

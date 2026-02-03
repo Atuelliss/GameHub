@@ -3,14 +3,74 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import TypedDict, Optional, Dict, Any, List
 from zoneinfo import ZoneInfo
+from pathlib import Path
 import time
 import random
+import json
 
 import discord
 
 from ..common.models import DB
 from ..databases.fish import FISH_DATABASE
 from ..databases.items import HATS_DATABASE, COATS_DATABASE, BOOTS_DATABASE, LURES_DATABASE
+
+
+def log_debug_catch(debug_log: list, user: discord.User, fish_id: str, fish_data: dict, weight_oz: float, length_in: float, 
+                    max_weight_oz: float, max_length_in: float, earned_token: bool, earned_perfect: bool, total_tokens: int):
+    """
+    Log a fish catch to the in-memory debug log.
+    
+    Parameters
+    ----------
+    debug_log : list
+        The cog's in-memory debug log list to append to
+    user : discord.User
+        The user who caught the fish
+    fish_id : str
+        The fish's database ID/key
+    fish_data : dict
+        The fish database entry
+    weight_oz : float
+        Weight caught
+    length_in : float
+        Length caught
+    max_weight_oz : float
+        Maximum possible weight
+    max_length_in : float
+        Maximum possible length
+    earned_token : bool
+        Whether token was awarded
+    earned_perfect : bool
+        Whether this was a perfect trophy
+    total_tokens : int
+        User's total tokens after this catch
+    """
+    try:
+        entry = {
+            "timestamp": datetime.now().isoformat(),
+            "user_id": user.id,
+            "user_name": f"{user.name}#{user.discriminator}" if user.discriminator != "0" else user.name,
+            "fish_id": fish_id,
+            "fish_name": fish_data.get("name", "Unknown"),
+            "weight_caught_oz": round(weight_oz, 1),
+            "weight_max_oz": round(max_weight_oz, 1),
+            "is_max_weight": weight_oz == max_weight_oz,
+            "length_caught_in": round(length_in, 1),
+            "length_max_in": round(max_length_in, 1),
+            "is_max_length": length_in == max_length_in,
+            "token_awarded": earned_token,
+            "perfect_trophy": earned_perfect,
+            "total_tokens": total_tokens
+        }
+        
+        debug_log.append(entry)
+        
+        # Keep log from growing too large (max 1000 entries)
+        if len(debug_log) > 1000:
+            debug_log.pop(0)
+    except Exception as e:
+        # Silently fail - debug logging shouldn't break gameplay
+        print(f"Debug log error: {e}")
 
 
 def ensure_lure_uses(lure_dict: dict) -> None:
@@ -603,20 +663,26 @@ def get_eligible_fish(
     season: str,
     weather_type: str,
     bait_id: str,
-    rod_id: Optional[str] = None
+    rod_id: Optional[str] = None,
+    line_integrity: float = 1.0
 ) -> List[tuple]:
     """
     Get list of eligible fish with their spawn weights.
     
     Returns list of (fish_id, fish_data, weight) tuples.
-    Weight is based on rarity, season, weather, bait match, and rod requirements.
+    Weight is based on rarity, season, weather, bait match, rod requirements, and line integrity.
     
     Parameters
     ----------
     rod_id : Optional[str]
         The ID of the equipped rod. Used to filter fish with required_rod restrictions.
+    line_integrity : float
+        Line integrity from 0.2 to 1.0. Lower values filter out rarer fish.
     """
     eligible = []
+    
+    # Get allowed rarities based on line integrity
+    allowed_rarities = get_allowed_rarities(line_integrity)
     
     for fish_id, fish_data in FISH_DATABASE.items():
         # Check water type match
@@ -633,8 +699,12 @@ def get_eligible_fish(
         if required_rod is not None and rod_id != required_rod:
             continue
         
-        # Base weight from rarity
+        # Check rarity against line integrity allowance
         rarity = fish_data.get("rarity", "common")
+        if rarity not in allowed_rarities:
+            continue
+        
+        # Base weight from rarity
         rarity_weights = {
             "common": 100,
             "uncommon": 50,
@@ -680,14 +750,20 @@ def select_fish(
     season: str,
     weather_type: str,
     bait_id: str,
-    rod_id: Optional[str] = None
+    rod_id: Optional[str] = None,
+    line_integrity: float = 1.0
 ) -> Optional[tuple]:
     """
     Select a random fish based on conditions.
     
     Returns (fish_id, fish_data) or None if no fish available.
+    
+    Parameters
+    ----------
+    line_integrity : float
+        Line integrity from 0.2 to 1.0. Lower values filter out rarer fish.
     """
-    eligible = get_eligible_fish(location, water_type, season, weather_type, bait_id, rod_id)
+    eligible = get_eligible_fish(location, water_type, season, weather_type, bait_id, rod_id, line_integrity)
     
     if not eligible:
         return None
@@ -748,7 +824,7 @@ def generate_fish_size(fish_data: Dict[str, Any], luck_bonus: int = 0) -> tuple:
     Generate weight and length for a caught fish.
     
     Returns (weight_oz, length_inches, is_max_size).
-    Base 0.05% chance of being maximum size (trophy), increased by luck.
+    Base 0.25% chance of being maximum size (trophy), increased by luck.
     
     Parameters
     ----------
@@ -768,12 +844,36 @@ def generate_fish_size(fish_data: Dict[str, Any], luck_bonus: int = 0) -> tuple:
     max_weight = fish_data.get("max_weight_oz", 10.0)
     max_length = fish_data.get("max_length_inches", 10.0)
     
-    # Trophy chance: 0.05% base + 0.01% per luck point
-    # Max luck (9) = 0.05% + 0.09% = 0.14% trophy chance
-    trophy_chance = 0.0005 + (luck_bonus * 0.0001)
+    # Trophy chance: 0.25% base + 0.01% per luck point
+    # Max luck (9) = 0.25% + 0.09% = 0.34% trophy chance
+    trophy_chance = 0.0025 + (luck_bonus * 0.0001)
     
     if random.random() < trophy_chance:
-        return (max_weight, max_length, True)
+        # Randomly determine if max weight, max length, or both
+        roll = random.random()
+        if roll < 0.33:  # 33% chance for max weight only
+            is_max_weight = True
+            is_max_length = False
+        elif roll < 0.66:  # 33% chance for max length only
+            is_max_weight = False
+            is_max_length = True
+        else:  # 34% chance for both (true trophy)
+            is_max_weight = True
+            is_max_length = True
+        
+        # Generate the actual values
+        weight = max_weight if is_max_weight else random.triangular(min_weight, max_weight, min_weight + (max_weight - min_weight) * 0.7)
+        
+        if is_max_length:
+            length = max_length
+        else:
+            weight_ratio = (weight - min_weight) / (max_weight - min_weight) if max_weight > min_weight else 0.5
+            min_length = max_length * 0.4
+            length = min_length + (max_length - min_length) * weight_ratio
+            length *= random.uniform(0.95, 1.05)
+            length = min(length, max_length)
+        
+        return (round(weight, 1), round(length, 1), is_max_weight or is_max_length)
     
     # Size distribution shifts toward larger fish with luck
     # Base mode is at 30% of range, luck shifts it toward 50%
@@ -799,8 +899,8 @@ def generate_fish_size(fish_data: Dict[str, Any], luck_bonus: int = 0) -> tuple:
 def calculate_cast_distance(location: str = "pond") -> int:
     """
     Calculate a random cast distance in feet (increments of 5).
-    Base range: 15-50 feet.
-    Ocean/River: +20-45 feet (35-95 feet total).
+    Base range: 20-100 feet.
+    Ocean/River: +20-45 feet (40-145 feet total).
     
     Parameters
     ----------
@@ -812,8 +912,8 @@ def calculate_cast_distance(location: str = "pond") -> int:
     int
         Cast distance in feet.
     """
-    # Base distance from 15 to 50 feet in 5-foot increments
-    base_distance = random.choice([15, 20, 25, 30, 35, 40, 45, 50])
+    # Base distance from 20 to 100 feet in 5-foot increments
+    base_distance = random.choice([20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100])
     
     # Add extra distance for ocean and river locations
     if location.lower() in ["ocean", "river"]:
@@ -823,6 +923,78 @@ def calculate_cast_distance(location: str = "pond") -> int:
     return base_distance
 
 
+def calculate_line_integrity(current_distance: int, original_distance: int, grace_feet: int = 15) -> float:
+    """
+    Calculate line integrity based on how much line was reeled in before a bite.
+    
+    Players get a grace period of free reeling (default 15ft) before penalties apply.
+    This prevents short RNG casts from being penalized.
+    
+    Parameters
+    ----------
+    current_distance : int
+        Current line distance in feet.
+    original_distance : int
+        Original cast distance in feet.
+    grace_feet : int
+        Amount of "free" reeling allowed before penalties (default 15ft).
+    
+    Returns
+    -------
+    float
+        Line integrity from 0.2 (minimum) to 1.0 (full).
+        - 1.0 = No penalty (within grace distance)
+        - 0.2 = Maximum penalty (reeled far beyond grace)
+    """
+    if original_distance <= 0:
+        return 1.0
+    
+    feet_reeled = original_distance - current_distance
+    
+    # Within grace distance = no penalty
+    if feet_reeled <= grace_feet:
+        return 1.0
+    
+    # Calculate penalty based on how much beyond grace they reeled
+    excess_reeled = feet_reeled - grace_feet
+    remaining_after_grace = original_distance - grace_feet
+    
+    if remaining_after_grace <= 0:
+        return 1.0
+    
+    # Linear falloff from 1.0 to 0.2 (floor)
+    integrity = 1.0 - (excess_reeled / remaining_after_grace) * 0.8
+    return max(0.2, integrity)
+
+
+def get_allowed_rarities(line_integrity: float) -> List[str]:
+    """
+    Get list of allowed fish rarities based on line integrity.
+    
+    Parameters
+    ----------
+    line_integrity : float
+        Line integrity from 0.2 to 1.0.
+    
+    Returns
+    -------
+    List[str]
+        List of allowed rarity strings.
+    """
+    if line_integrity >= 0.8:
+        # Full access to all rarities
+        return ["common", "uncommon", "rare", "epic", "legendary"]
+    elif line_integrity >= 0.5:
+        # No legendary
+        return ["common", "uncommon", "rare", "epic"]
+    elif line_integrity >= 0.3:
+        # No epic or legendary
+        return ["common", "uncommon", "rare"]
+    else:
+        # Common and uncommon only
+        return ["common", "uncommon"]
+
+
 def check_fish_interest(
     location: str,
     water_type: str,
@@ -830,18 +1002,24 @@ def check_fish_interest(
     weather_type: str,
     bait_id: str,
     luck_modifier: float = 1.0,
-    rod_id: Optional[str] = None
+    rod_id: Optional[str] = None,
+    line_integrity: float = 1.0
 ) -> bool:
     """
     Check if a fish is interested based on conditions.
     
     Returns True if a fish shows interest.
-    Base chance is 30%, modified by conditions.
+    Base chance is 30%, modified by conditions and line integrity.
+    
+    Parameters
+    ----------
+    line_integrity : float
+        Line integrity from 0.2 to 1.0. Lower values reduce bite chance.
     """
     base_chance = 0.30
     
     # Get number of eligible fish - more fish = higher chance
-    eligible = get_eligible_fish(location, water_type, season, weather_type, bait_id, rod_id)
+    eligible = get_eligible_fish(location, water_type, season, weather_type, bait_id, rod_id, line_integrity)
     if not eligible:
         return False
     
@@ -849,7 +1027,11 @@ def check_fish_interest(
     fish_modifier = min(1.0 + len(eligible) * 0.02, 1.5)
     
     # Apply luck modifier from gear/stats
-    final_chance = base_chance * fish_modifier * luck_modifier
+    base_final = base_chance * fish_modifier * luck_modifier
+    
+    # Apply line integrity penalty to bite chance
+    # Integrity of 1.0 = no penalty, 0.2 = 20% of normal bite rate
+    final_chance = base_final * line_integrity
     
     return random.random() < final_chance
 
@@ -949,6 +1131,9 @@ def check_for_bite(
     tuple
         (bool interested, str message)
     """
+    # Calculate line integrity based on how much was reeled in before bite
+    line_integrity = calculate_line_integrity(session.line_distance, session.max_distance)
+    
     interested = check_fish_interest(
         session.location,
         session.water_type,
@@ -956,7 +1141,8 @@ def check_for_bite(
         weather_type,
         bait_id,
         luck_modifier,
-        session.rod_id
+        session.rod_id,
+        line_integrity
     )
     
     if interested:
@@ -964,8 +1150,11 @@ def check_for_bite(
         session.phase = FishingPhase.FISH_FOLLOWING
         msg = "*As you pull in a bit of the line, you get a sense that something is following your bait.*"
     else:
-        # Nothing biting
-        msg = "*After a bit of time you believe nothing is biting.*"
+        # Nothing biting - add hint if line integrity is low
+        if line_integrity < 0.5:
+            msg = "*After a bit of time you believe nothing is biting. The fish seem wary of your shortened line...*"
+        else:
+            msg = "*After a bit of time you believe nothing is biting.*"
     
     session.add_message(msg)
     session.reset_timer()
@@ -1027,6 +1216,9 @@ def fish_strikes(
     """
     # 50/50 chance the fish strikes or swims away
     if random.random() < 0.5:
+        # Calculate line integrity for fish selection (affects rarity)
+        line_integrity = calculate_line_integrity(session.line_distance, session.max_distance)
+        
         # Fish strikes!
         result = select_fish(
             session.location,
@@ -1034,7 +1226,8 @@ def fish_strikes(
             season,
             weather_type,
             bait_id,
-            session.rod_id
+            session.rod_id,
+            line_integrity
         )
         
         if result:
@@ -1057,7 +1250,7 @@ def fish_strikes(
     return (None, None, msg)
 
 
-def attempt_set_hook(session: FishingSession) -> tuple:
+def attempt_set_hook(session: FishingSession, user_data=None) -> tuple:
     """
     Attempt to set the hook when the fish strikes.
     
@@ -1065,6 +1258,8 @@ def attempt_set_hook(session: FishingSession) -> tuple:
     ----------
     session : FishingSession
         The current fishing session.
+    user_data : User, optional
+        User data for checking pending spawns (admin testing).
     
     Returns
     -------
@@ -1081,9 +1276,44 @@ def attempt_set_hook(session: FishingSession) -> tuple:
         session.add_message(msg)
         return (False, msg)
     
-    # Successfully set the hook!
-    # Note: luck_bonus should be passed in from the view where user_data is available
-    weight, length, is_max = generate_fish_size(session.fish_data, session.luck_bonus)
+    # Check for admin-spawned fish
+    if user_data and hasattr(user_data, 'pending_spawn') and user_data.pending_spawn:
+        spawn = user_data.pending_spawn
+        
+        # Override the fish type if specified in spawn
+        from ..databases.fish import FISH_DATABASE
+        spawn_fish_id = spawn.get("fish_id")
+        if spawn_fish_id and spawn_fish_id in FISH_DATABASE:
+            session.fish_id = spawn_fish_id
+            session.fish_data = FISH_DATABASE[spawn_fish_id]
+        
+        fish_data = session.fish_data
+        
+        # Parse weight
+        if spawn["weight"] == "max":
+            weight = fish_data.get("max_weight_oz", 10.0)
+        elif spawn["weight"] == "random":
+            weight, _, _ = generate_fish_size(fish_data, session.luck_bonus)
+        else:
+            weight = float(spawn["weight"])
+        
+        # Parse length
+        if spawn["length"] == "max":
+            length = fish_data.get("max_length_inches", 10.0)
+        elif spawn["length"] == "random":
+            _, length, _ = generate_fish_size(fish_data, session.luck_bonus)
+        else:
+            length = float(spawn["length"])
+        
+        # Determine if max size
+        is_max = (weight == fish_data.get("max_weight_oz")) or (length == fish_data.get("max_length_inches"))
+        
+        # Clear the spawn
+        user_data.pending_spawn = None
+    else:
+        # Normal fish generation
+        weight, length, is_max = generate_fish_size(session.fish_data, session.luck_bonus)
+    
     session.fish_weight_oz = weight
     session.fish_length_inches = length
     session.is_max_size = is_max
@@ -1242,7 +1472,7 @@ def process_reel_attempt(session: FishingSession, did_reel: bool) -> tuple:
     return (True, "", False)
 
 
-def land_the_fish(session: FishingSession, user_data) -> tuple:
+def land_the_fish(session: FishingSession, user_data, debug_log: list = None, user_obj: discord.User = None) -> tuple:
     """
     Land the fish and add it to inventory.
     
@@ -1252,11 +1482,15 @@ def land_the_fish(session: FishingSession, user_data) -> tuple:
         The current fishing session.
     user_data : User
         The user's data model.
+    debug_log : list, optional
+        In-memory debug log list for debug logging
+    user_obj : discord.User, optional
+        Discord user object for debug logging
     
     Returns
     -------
     tuple
-        (str message, bool is_record, bool earned_token)
+        (str message, bool is_record, bool earned_token, dict debug_info)
     """
     fish_name = session.fish_data.get("name", "fish") if session.fish_data else "fish"
     weight_oz = session.fish_weight_oz
@@ -1271,13 +1505,23 @@ def land_the_fish(session: FishingSession, user_data) -> tuple:
     
     length_display = f"{length_in:.1f} inches"
     
+    # Check for FishMaster token (max weight OR max length)
+    # This needs to happen before adding to inventory so is_trophy is correct
+    max_weight_oz = session.fish_data.get("max_weight_oz", 0)
+    max_length_inches = session.fish_data.get("max_length_inches", 0)
+    
+    is_max_weight = (weight_oz == max_weight_oz)
+    is_max_length = (length_in == max_length_inches)
+    earned_token = is_max_weight or is_max_length
+    earned_perfect_trophy = is_max_weight and is_max_length  # Both max - placeholder for future reward
+    
     # Add fish to inventory
     fish_entry = {
         "fish_id": session.fish_id,
         "weight_oz": weight_oz,
         "length_inches": length_in,
         "location": session.location,
-        "is_trophy": session.is_max_size,
+        "is_trophy": earned_token,  # True if either max weight or max length
         "fishpoints": session.fish_data.get("base_fishpoints", 10)
     }
     user_data.current_fish_inventory.append(fish_entry)
@@ -1306,11 +1550,7 @@ def land_the_fish(session: FishingSession, user_data) -> tuple:
     
     # Update stats
     user_data.total_fish_ever_caught += 1
-    user_data.total_fishpoints += session.fish_data.get("base_fishpoints", 10)
-    
-    # Update max fishpoints record if needed
-    if user_data.total_fishpoints > user_data.most_fishpoints_ever:
-        user_data.most_fishpoints_ever = user_data.total_fishpoints
+    # Note: fishpoints are awarded when selling fish, not when catching
     
     # Check for personal record
     is_record = user_data.update_fish_record(
@@ -1319,19 +1559,27 @@ def land_the_fish(session: FishingSession, user_data) -> tuple:
         length_in
     )
     
-    # Check for FishMaster token (max size fish)
-    earned_token = session.is_max_size
+    # Award FishMaster token if earned (max weight OR max length)
     if earned_token:
         user_data.current_fishmaster_tokens += 1
         # Update max tokens record if needed
         if user_data.current_fishmaster_tokens > user_data.most_fishmaster_tokens_ever:
             user_data.most_fishmaster_tokens_ever = user_data.current_fishmaster_tokens
+        
+        # TODO: Implement reward for earned_perfect_trophy (both max weight AND max length)
+        # This is a placeholder for a future special reward system
     
     # Build message
-    if session.is_max_size:
-        msg = f"🏆 *You managed to land a TROPHY {length_display}, {weight_display} **{fish_name}**! This is a maximum size specimen!*"
-        if earned_token:
-            msg += "\n\n🎖️ **You earned a FishMaster Token!**"
+    if is_max_weight and is_max_length:
+        # Both at maximum - perfect trophy
+        msg = f"🏆💎 *You managed to land a PERFECT TROPHY {length_display}, {weight_display} **{fish_name}**! This is the absolute maximum size specimen!*"
+        msg += "\n\n🎖️ **You earned a FishMaster Token!**"
+        # msg += "\n✨ **[PLACEHOLDER: Special reward for perfect trophy]**"  # Uncomment when reward implemented
+    elif is_max_weight or is_max_length:
+        # One at maximum - record-breaking
+        record_type = "heaviest" if is_max_weight else "longest"
+        msg = f"🏆 *You managed to land the {record_type} possible {length_display}, {weight_display} **{fish_name}**!*"
+        msg += "\n\n🎖️ **You earned a FishMaster Token!**"
     elif is_record:
         msg = f"⭐ *You managed to land a {length_display}, {weight_display} **{fish_name}**! That's a new personal record!*"
     else:
@@ -1340,7 +1588,28 @@ def land_the_fish(session: FishingSession, user_data) -> tuple:
     session.add_message(msg)
     session.phase = FishingPhase.LANDED
     
-    return (msg, is_record, earned_token)
+    # Build debug info
+    debug_info = {
+        "weight_oz": weight_oz,
+        "length_in": length_in,
+        "max_weight_oz": max_weight_oz,
+        "max_length_in": max_length_inches,
+        "is_max_weight": is_max_weight,
+        "is_max_length": is_max_length,
+        "earned_token": earned_token,
+        "earned_perfect_trophy": earned_perfect_trophy,
+        "total_tokens": user_data.current_fishmaster_tokens
+    }
+    
+    # Log to in-memory debug log if user has debug mode enabled
+    if user_data.debug_mode and debug_log is not None and user_obj:
+        log_debug_catch(
+            debug_log, user_obj, session.fish_id, session.fish_data,
+            weight_oz, length_in, max_weight_oz, max_length_inches,
+            earned_token, earned_perfect_trophy, user_data.current_fishmaster_tokens
+        )
+    
+    return (msg, is_record, earned_token, debug_info)
 
 
 def handle_line_snap(session: FishingSession, user_data) -> tuple:

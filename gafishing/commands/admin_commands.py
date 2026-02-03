@@ -1,5 +1,7 @@
 import asyncio
 from datetime import datetime
+from io import BytesIO
+import json
 from zoneinfo import ZoneInfo, available_timezones
 
 import discord
@@ -8,12 +10,17 @@ from redbot.core import bank, commands
 from ..abc import MixinMeta
 
 async def is_admin(ctx: commands.Context) -> bool:
-    """Check if user is a bot admin or has Manage Server permission.
+    """Check if user is a bot admin, bot owner, or has Manage Server permission.
     
     Returns True if the user:
+    - Is the bot owner, OR
     - Is a Red-DiscordBot admin, OR
     - Has the Manage Server (manage_guild) Discord permission
     """
+    # Check if bot owner first
+    if await ctx.bot.is_owner(ctx.author):
+        return True
+    
     if not ctx.guild:
         return False
     
@@ -373,6 +380,61 @@ class WipeUsersConfirmModal(discord.ui.Modal, title="⚠️ FINAL CONFIRMATION")
         self.view.stop()
 
 
+class ConversionRateModal(discord.ui.Modal, title="⚙️ Set Conversion Rate"):
+    """Modal for setting custom conversion rate."""
+    
+    rate_input = discord.ui.TextInput(
+        label="Conversion Rate",
+        placeholder="e.g., 10 (meaning 10 FP = 1 currency)",
+        required=True,
+        min_length=1,
+        max_length=20,
+        style=discord.TextStyle.short
+    )
+    
+    def __init__(self, view: "FishSetupView", currency_name: str):
+        super().__init__()
+        self.view = view
+        self.currency_name = currency_name
+        self.rate_input.placeholder = f"e.g., 10 (meaning 10 FP = 1 {currency_name})"
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        """Handle modal submission."""
+        try:
+            rate = float(self.rate_input.value.strip())
+            if rate <= 0:
+                await interaction.response.send_message(
+                    "⚠️ Invalid rate. Rate must be greater than 0.",
+                    ephemeral=True
+                )
+                return
+            
+            # Save the rate
+            self.view.conf.discord_currency_conversion_rate = rate
+            self.view.cog.save()
+            
+            # Format rate display
+            if rate >= 1:
+                rate_text = f"{rate:g} FP = 1 {self.currency_name}"
+            else:
+                rate_text = f"1 FP = {1/rate:g} {self.currency_name}"
+            
+            await interaction.response.send_message(
+                f"✅ Conversion rate set to **{rate_text}**",
+                ephemeral=True
+            )
+            
+            # Complete setup
+            await self.view.message.edit(embed=await self.view.get_complete_embed(), view=None)
+            self.view.stop()
+            
+        except ValueError:
+            await interaction.response.send_message(
+                "⚠️ Invalid number. Please enter a valid number (decimals allowed).",
+                ephemeral=True
+            )
+
+
 class WipeUsersConfirmView(discord.ui.View):
     """Confirmation view for wiping all users."""
     
@@ -707,17 +769,30 @@ class FishSetupView(discord.ui.View):
     async def get_rate_embed(self) -> discord.Embed:
         """Generate conversion rate embed."""
         currency_name = await bank.get_currency_name(self.ctx.guild)
+        rate = self.conf.discord_currency_conversion_rate
+        
+        # Format rate display based on value
+        if rate >= 1:
+            rate_text = f"{rate:g} FP = 1 {currency_name}"
+        else:
+            rate_text = f"1 FP = {1/rate:g} {currency_name}"
         
         embed = discord.Embed(
             title="⚙️ Set Conversion Rate",
             description=(
-                f"**Current rate:** {self.conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}\n\n"
-                f"The default rate is 100 FP = 1 {currency_name}.\n\n"
-                "Would you like to set a custom rate?"
+                f"**Current rate:** {rate_text}\n\n"
+                f"The default rate is 1 FP = 1 {currency_name}.\n\n"
+                "Would you like to set a custom rate?\n\n"
+                "**Examples:**\n"
+                f"• `100` = 100 FP per 1 {currency_name}\n"
+                f"• `0.5` = 1 FP per 2 {currency_name}\n"
+                f"• `0.1` = 1 FP per 10 {currency_name}\n"
+                f"• `0.04` = 1 FP per 25 {currency_name}\n"
+                f"• `0.02` = 1 FP per 50 {currency_name}"
             ),
             color=discord.Color.blue()
         )
-        embed.set_footer(text="If setting custom rate, type the number of FP per 1 currency in chat")
+        embed.set_footer(text="Click 'Set Custom Rate' to enter your rate")
         return embed
     
     async def get_complete_embed(self) -> discord.Embed:
@@ -729,6 +804,13 @@ class FishSetupView(discord.ui.View):
             color=discord.Color.green()
         )
         
+        # Format rate display based on value
+        rate = self.conf.discord_currency_conversion_rate
+        if rate >= 1:
+            rate_text = f"{rate:g} FP = 1 {currency_name}"
+        else:
+            rate_text = f"1 FP = {1/rate:g} {currency_name}"
+        
         embed.add_field(
             name="Configuration Summary",
             value=(
@@ -736,7 +818,7 @@ class FishSetupView(discord.ui.View):
                 f"• Timezone: `{self.conf.timezone}`\n"
                 f"• Hemisphere: `{self.conf.hemisphere.title()}ern`\n"
                 f"• Currency Conversion: {'🟢 Enabled' if self.conf.discord_currency_conversion_enabled else '🔴 Disabled'}\n"
-                f"• Conversion Rate: {self.conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}"
+                f"• Conversion Rate: {rate_text}"
             ),
             inline=False
         )
@@ -891,49 +973,9 @@ class FishSetupView(discord.ui.View):
     
     async def _set_custom_rate(self, interaction: discord.Interaction):
         """Set custom conversion rate."""
-        self.awaiting_rate = True
         currency_name = await bank.get_currency_name(self.ctx.guild)
-        
-        embed = await self.get_rate_embed()
-        embed.description += f"\n\n⏰ **Waiting for rate input...**\nType the number of FP per 1 {currency_name}"
-        
-        await interaction.response.edit_message(embed=embed, view=self)
-        asyncio.create_task(self._listen_for_rate())
-    
-    async def _listen_for_rate(self):
-        """Listen for conversion rate input."""
-        def check(m: discord.Message) -> bool:
-            return m.author.id == self.ctx.author.id and m.channel.id == self.ctx.channel.id
-        
-        currency_name = await bank.get_currency_name(self.ctx.guild)
-        
-        try:
-            msg = await self.cog.bot.wait_for("message", check=check, timeout=120.0)
-            
-            # Check if we're still awaiting (wasn't cancelled)
-            if not self.awaiting_rate:
-                return
-            
-            try:
-                rate = int(msg.content.strip())
-                if rate <= 0:
-                    await self.ctx.send(f"⚠️ Invalid rate. Keeping default of **{self.conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}**.")
-                else:
-                    self.conf.discord_currency_conversion_rate = rate
-                    self.cog.save()
-                    await self.ctx.send(f"✅ Conversion rate set to **{rate:,} FP = 1 {currency_name}**")
-            except ValueError:
-                await self.ctx.send(f"⚠️ Invalid number. Keeping default of **{self.conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}**.")
-            
-            self.awaiting_rate = False
-            await self.message.edit(embed=await self.get_complete_embed(), view=None)
-            self.stop()
-        except asyncio.TimeoutError:
-            if self.awaiting_rate:
-                self.awaiting_rate = False
-                await self.ctx.send(f"⏰ Timed out. Keeping default rate.")
-                await self.message.edit(embed=await self.get_complete_embed(), view=None)
-                self.stop()
+        modal = ConversionRateModal(self, currency_name)
+        await interaction.response.send_modal(modal)
     
     async def _keep_default_rate(self, interaction: discord.Interaction):
         """Keep default conversion rate."""
@@ -1213,9 +1255,16 @@ class Admin(MixinMeta):
             value=game_status,
             inline=False
         )
+        # Format rate display based on value
+        rate = conf.discord_currency_conversion_rate
+        if rate >= 1:
+            rate_text = f"{rate:g} FP = 1 {currency_name}"
+        else:
+            rate_text = f"1 FP = {1/rate:g} {currency_name}"
+        
         embed.add_field(
             name="Currency Conversion System",
-            value=f"{currency_status}\n💱 Rate: {conf.discord_currency_conversion_rate:,} FP:1 {currency_name}",
+            value=f"{currency_status}\n💱 Rate: {rate_text}",
             inline=False
         )
         embed.add_field(
@@ -1264,17 +1313,28 @@ class Admin(MixinMeta):
         
         status = "✅ **Enabled**" if conf.discord_currency_conversion_enabled else "❌ **Disabled**"
         currency_name = await bank.get_currency_name(ctx.guild)
+        
+        # Format rate display based on value
+        rate = conf.discord_currency_conversion_rate
+        if rate >= 1:
+            rate_text = f"{rate:g} FP = 1 {currency_name}"
+        else:
+            rate_text = f"1 FP = {1/rate:g} {currency_name}"
+        
         await ctx.send(
             f"💱 Currency conversion is now {status}\n"
-            f"Rate: **{conf.discord_currency_conversion_rate:,} FP = 1 {currency_name}**"
+            f"Rate: **{rate_text}**"
         )
 
     @fishset.command(name="setrate")
     @commands.check(is_admin)
-    async def set_conversion_rate(self, ctx: commands.Context, rate: int):
+    async def set_conversion_rate(self, ctx: commands.Context, rate: float):
         """Set the FishPoints to Discord currency conversion rate.
         
-        Example: `fishset setrate 100` means 100 FP = 1 Discord currency.
+        Examples:
+        - `fishset setrate 100` = 100 FP per 1 currency
+        - `fishset setrate 0.5` = 1 FP per 2 currency
+        - `fishset setrate 0.1` = 1 FP per 10 currency
         """
         if rate <= 0:
             await ctx.send("❌ Rate must be a positive number.")
@@ -1286,7 +1346,20 @@ class Admin(MixinMeta):
         self.save()
         
         currency_name = await bank.get_currency_name(ctx.guild)
-        await ctx.send(f"✅ Conversion rate updated: **{rate:,} FP = 1 {currency_name}** (was {old_rate:,})")
+        
+        # Format new rate display
+        if rate >= 1:
+            new_rate_text = f"{rate:g} FP = 1 {currency_name}"
+        else:
+            new_rate_text = f"1 FP = {1/rate:g} {currency_name}"
+        
+        # Format old rate display
+        if old_rate >= 1:
+            old_rate_text = f"{old_rate:g} FP = 1 {currency_name}"
+        else:
+            old_rate_text = f"1 FP = {1/old_rate:g} {currency_name}"
+        
+        await ctx.send(f"✅ Conversion rate updated: **{new_rate_text}** (was {old_rate_text})")
 
     @fishset.group(name="channel", invoke_without_command=True)
     @commands.check(is_admin)
@@ -1465,3 +1538,330 @@ class Admin(MixinMeta):
                 f"Previous: **{old_fp:,}**\n"
                 f"Most Ever: **{user_data.most_fishpoints_ever:,}**{most_changed}"
             )
+    
+    @fishset.command(name="debug")
+    @commands.is_owner()
+    async def set_debug(self, ctx: commands.Context, user: discord.Member):
+        """Toggle debug mode for a user.
+        
+        When enabled:
+        - Shows detailed catch info (ephemeral message to user)
+        - Logs all catches to debug log in memory
+        - Use for testing token rewards and catch mechanics
+        
+        Examples:
+            [p]fishset debug @User - Toggle debug mode
+        """
+        conf = self.db.get_conf(ctx.guild)
+        user_data = conf.get_user(user)
+        
+        user_data.debug_mode = not user_data.debug_mode
+        self.save()
+        
+        status = "enabled" if user_data.debug_mode else "disabled"
+        await ctx.send(
+            f"✅ Debug mode **{status}** for {user.mention}\n"
+            f"{'Debug info will be shown after each catch and logged to memory.' if user_data.debug_mode else 'Debug mode turned off.'}"
+        )
+    
+    @fishset.command(name="spawnfish")
+    @commands.is_owner()
+    async def spawn_fish(self, ctx: commands.Context, user: discord.Member, fish_id: str, weight: str = "random", length: str = "random"):
+        """Queue a specific fish for a user's next catch (testing).
+        
+        Parameters:
+        - user: The user who will catch this fish
+        - fish_id: ID of the fish (e.g., largemouth_bass, red_snapper)
+        - weight: "max", "random", or specific oz value (e.g., "200")
+        - length: "max", "random", or specific inches value (e.g., "25.5")
+        
+        Examples:
+            [p]fishset spawnfish @User largemouth_bass max max
+            [p]fishset spawnfish @User red_snapper max random
+            [p]fishset spawnfish @User bluegill 50 8.5
+        """
+        from ..databases.fish import FISH_DATABASE
+        
+        # Validate fish ID
+        if fish_id not in FISH_DATABASE:
+            available = ", ".join(sorted(FISH_DATABASE.keys())[:10])
+            await ctx.send(
+                f"❌ Unknown fish ID: `{fish_id}`\n"
+                f"Available fish IDs: {available}... (use `!fish` command to see all)"
+            )
+            return
+        
+        fish_data = FISH_DATABASE[fish_id]
+        fish_name = fish_data.get("name", fish_id)
+        
+        # Validate weight parameter
+        if weight not in ["max", "random"]:
+            try:
+                weight_val = float(weight)
+                if weight_val <= 0:
+                    await ctx.send("❌ Weight must be positive.")
+                    return
+            except ValueError:
+                await ctx.send('❌ Weight must be "max", "random", or a number.')
+                return
+        
+        # Validate length parameter
+        if length not in ["max", "random"]:
+            try:
+                length_val = float(length)
+                if length_val <= 0:
+                    await ctx.send("❌ Length must be positive.")
+                    return
+            except ValueError:
+                await ctx.send('❌ Length must be "max", "random", or a number.')
+                return
+        
+        # Queue the spawn
+        conf = self.db.get_conf(ctx.guild)
+        user_data = conf.get_user(user)
+        user_data.pending_spawn = {
+            "fish_id": fish_id,
+            "weight": weight,
+            "length": length
+        }
+        self.save()
+        
+        # Build confirmation message
+        max_weight = fish_data.get("max_weight_oz", 0)
+        max_length = fish_data.get("max_length_inches", 0)
+        
+        weight_display = f"max ({max_weight} oz / {max_weight/16:.2f} lbs)" if weight == "max" else (weight if weight == "random" else f"{weight} oz")
+        length_display = f"max ({max_length} inches)" if length == "max" else (length if length == "random" else f"{length} inches")
+        
+        await ctx.send(
+            f"✅ Queued **{fish_name}** for {user.mention}'s next catch\n"
+            f"Weight: {weight_display}\n"
+            f"Length: {length_display}"
+        )
+    
+    @fishset.command(name="debugdownload")
+    @commands.is_owner()
+    async def debug_download(self, ctx: commands.Context):
+        """Download the fishing debug log.
+        
+        The log contains detailed information about all catches 
+        made while debug mode was enabled for users.
+        Note: Log is stored in memory and will be cleared on cog reload.
+        """
+        if not self.debug_log:
+            await ctx.send("❌ No debug log entries. Debug mode must be enabled for at least one user who has caught fish.")
+            return
+        
+        try:
+            # Create BytesIO buffer with formatted JSON
+            buffer = BytesIO()
+            formatted_json = json.dumps(self.debug_log, indent=2)
+            buffer.write(formatted_json.encode('utf-8'))
+            buffer.seek(0)  # Reset to beginning for reading
+            
+            await ctx.send(
+                f"📊 Fishing debug log ({len(self.debug_log):,} entries):", 
+                file=discord.File(buffer, filename="fishing_debug_export.json")
+            )
+        except Exception as e:
+            await ctx.send(f"❌ Error creating debug log: {e}")
+    
+    @fishset.command(name="debugclear")
+    @commands.is_owner()
+    async def debug_clear(self, ctx: commands.Context):
+        """Clear the fishing debug log.
+        
+        This permanently removes all debug log entries from memory.
+        """
+        if not self.debug_log:
+            await ctx.send("❌ No debug log entries to clear.")
+            return
+        
+        entry_count = len(self.debug_log)
+        self.debug_log.clear()
+        await ctx.send(f"✅ Debug log cleared ({entry_count:,} entries removed).")
+
+    @fishset.command(name="listfish")
+    async def list_fish(self, ctx: commands.Context, water_type: str = None):
+        """Display a paginated list of all fish in the database.
+        
+        Parameters:
+        - water_type: Optional filter - "freshwater", "saltwater", or "both"
+        
+        If no filter is provided, all fish are shown sorted by water type then alphabetically.
+        
+        Examples:
+            [p]fishset listfish - Show all fish
+            [p]fishset listfish freshwater - Show only freshwater fish
+            [p]fishset listfish saltwater - Show only saltwater fish
+        """
+        from ..databases.fish import FISH_DATABASE
+        
+        # Validate water_type input
+        valid_types = ["freshwater", "saltwater", "both", None]
+        if water_type and water_type.lower() not in ["freshwater", "saltwater", "both"]:
+            await ctx.send("❌ Invalid water type. Use `freshwater`, `saltwater`, `both`, or leave empty for all fish.")
+            return
+        
+        water_filter = water_type.lower() if water_type else None
+        
+        # Build fish list dynamically from database
+        fish_list = []
+        for fish_id, fish_data in FISH_DATABASE.items():
+            fish_water = fish_data.get("water_type", "unknown")
+            
+            # Apply filter
+            if water_filter and water_filter != "both":
+                if fish_water != water_filter:
+                    continue
+            
+            fish_list.append({
+                "id": fish_id,
+                "name": fish_data.get("name", fish_id),
+                "water_type": fish_water,
+                "rarity": fish_data.get("rarity", "common"),
+                "locations": fish_data.get("locations", []),
+                "max_weight_oz": fish_data.get("max_weight_oz", 0),
+                "max_length_inches": fish_data.get("max_length_inches", 0),
+                "base_fishpoints": fish_data.get("base_fishpoints", 0),
+            })
+        
+        if not fish_list:
+            await ctx.send("❌ No fish found matching that filter.")
+            return
+        
+        # Sort by water type, then alphabetically by name
+        fish_list.sort(key=lambda f: (f["water_type"], f["name"].lower()))
+        
+        # Create and send the view
+        view = FishListView(cog=self, author=ctx.author, fish_list=fish_list, water_filter=water_filter)
+        embed = view.create_embed()
+        message = await ctx.send(embed=embed, view=view)
+        view.message = message
+
+
+class FishListView(discord.ui.View):
+    """Paginated view for displaying fish list."""
+    
+    FISH_PER_PAGE = 10
+    
+    def __init__(self, cog, author: discord.Member, fish_list: list, water_filter: str = None):
+        super().__init__(timeout=300.0)  # 5 minute timeout
+        self.cog = cog
+        self.author = author
+        self.fish_list = fish_list
+        self.water_filter = water_filter
+        self.page = 0
+        self.total_pages = (len(fish_list) + self.FISH_PER_PAGE - 1) // self.FISH_PER_PAGE
+        self.message = None
+        
+        self._update_buttons()
+    
+    def _update_buttons(self):
+        """Update button states based on current page."""
+        self.prev_button.disabled = (self.page == 0)
+        self.next_button.disabled = (self.page >= self.total_pages - 1)
+        self.page_indicator.label = f"Page {self.page + 1}/{self.total_pages}"
+    
+    def create_embed(self) -> discord.Embed:
+        """Create the embed for the current page."""
+        # Calculate slice for current page
+        start_idx = self.page * self.FISH_PER_PAGE
+        end_idx = start_idx + self.FISH_PER_PAGE
+        page_fish = self.fish_list[start_idx:end_idx]
+        
+        # Build title
+        if self.water_filter:
+            title = f"Fish Database - {self.water_filter.title()}"
+        else:
+            title = "Fish Database - All Fish"
+        
+        embed = discord.Embed(
+            title=title,
+            description=f"{len(self.fish_list)} fish total",
+            color=discord.Color.blue()
+        )
+        
+        # Build fish list - one line per fish, no emojis
+        fish_lines = []
+        for fish in page_fish:
+            # Format weight
+            max_oz = fish["max_weight_oz"]
+            if max_oz >= 16:
+                weight_str = f"{max_oz/16:.1f}lbs"
+            else:
+                weight_str = f"{max_oz:.1f}oz"
+            
+            # Water type abbreviation
+            water = "SW" if fish["water_type"] == "saltwater" else "FW"
+            
+            # Rarity abbreviation
+            rarity_abbrev = {
+                "common": "C",
+                "uncommon": "U", 
+                "rare": "R",
+                "epic": "E",
+                "legendary": "L"
+            }
+            rarity = rarity_abbrev.get(fish["rarity"], "C")
+            
+            fish_lines.append(
+                f"`{fish['id']}` - {fish['name']} [{water}/{rarity}] {weight_str}, {fish['max_length_inches']:.1f}in"
+            )
+        
+        embed.add_field(
+            name="Fish",
+            value="\n".join(fish_lines) if fish_lines else "No fish on this page.",
+            inline=False
+        )
+        
+        embed.set_footer(text=f"Page {self.page + 1}/{self.total_pages} | FW=Freshwater, SW=Saltwater | C/U/R/E/L=Rarity")
+        
+        return embed
+    
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Only allow the command author to interact."""
+        if interaction.user.id != self.author.id:
+            await interaction.response.send_message("This menu isn't for you!", ephemeral=True)
+            return False
+        return True
+    
+    async def on_timeout(self):
+        """Handle timeout - disable all buttons."""
+        self.stop()
+        if self.message:
+            try:
+                for item in self.children:
+                    item.disabled = True
+                await self.message.edit(view=self)
+            except discord.NotFound:
+                pass
+            except discord.HTTPException:
+                pass
+    
+    @discord.ui.button(label="◀️ Previous", style=discord.ButtonStyle.secondary, row=0)
+    async def prev_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Go to previous page."""
+        self.page = max(0, self.page - 1)
+        self._update_buttons()
+        embed = self.create_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+    
+    @discord.ui.button(label="Page 1/1", style=discord.ButtonStyle.secondary, disabled=True, row=0)
+    async def page_indicator(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Page indicator (non-interactive)."""
+        pass
+    
+    @discord.ui.button(label="Next ▶️", style=discord.ButtonStyle.secondary, row=0)
+    async def next_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Go to next page."""
+        self.page = min(self.total_pages - 1, self.page + 1)
+        self._update_buttons()
+        embed = self.create_embed()
+        await interaction.response.edit_message(embed=embed, view=self)
+    
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, row=0)
+    async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Close the view."""
+        self.stop()
+        await interaction.response.edit_message(view=None)
