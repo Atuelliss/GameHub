@@ -12,6 +12,9 @@ log = logging.getLogger("red.rroulette")
 def channel_check():
     """Check if the command is being used in an allowed channel"""
     async def predicate(ctx):
+        # Not usable in DMs
+        if ctx.guild is None:
+            return False
         # Skip check for guild owner and bot owner
         if await ctx.bot.is_owner(ctx.author) or ctx.author == ctx.guild.owner:
             return True
