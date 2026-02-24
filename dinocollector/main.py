@@ -164,7 +164,12 @@ class DinoCollector(
             if len(user_conf.current_dino_inv) >= current_size:
                 newly_unlocked.append("full_inventory")
                 
-        # 11. Maxed Out (Max Upgrade)
+        # 11. Maxed Out (Max Upgrade) & Milestone Upgrades
+        inv_size = conf.base_inventory_size + (user_conf.current_inventory_upgrade_level * conf.inventory_per_upgrade)
+        if not is_unlocked("upgrade_150") and inv_size >= 150:
+            newly_unlocked.append("upgrade_150")
+        if not is_unlocked("upgrade_200") and inv_size >= 200:
+            newly_unlocked.append("upgrade_200")
         if not is_unlocked("max_upgrade"):
             if user_conf.current_inventory_upgrade_level >= conf.maximum_upgrade_amount:
                 newly_unlocked.append("max_upgrade")
