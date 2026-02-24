@@ -80,6 +80,10 @@ class Shop(MixinMeta):
 
         # Achievements
         await self.check_achievement(user_conf, "first_upgrade", ctx)
+        if new_size >= 150:
+            await self.check_achievement(user_conf, "upgrade_150", ctx)
+        if new_size >= 200:
+            await self.check_achievement(user_conf, "upgrade_200", ctx)
         if user_conf.current_inventory_upgrade_level >= conf.maximum_upgrade_amount:
             await self.check_achievement(user_conf, "max_upgrade", ctx)
         if user_conf.has_spent_dinocoins >= 5000:
