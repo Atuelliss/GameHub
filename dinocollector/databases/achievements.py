@@ -65,6 +65,18 @@ achievement_library = {
         "reward": 100,
         "hint": "Expand your inventory to the limit."
     },
+    "upgrade_150": {
+        "name": "Storage Specialist",
+        "description": "Expanded your inventory to 150 slots!",
+        "reward": 150,
+        "hint": "Keep expanding your storage capabilities."
+    },
+    "upgrade_200": {
+        "name": "Warehouse Manager",
+        "description": "Expanded your inventory to 200 slots!",
+        "reward": 200,
+        "hint": "You're going to need a bigger garage."
+    },
     "first_buddy": {
         "name": "Best Friends",
         "description": "Set a Dinosaur as your Buddy for the first time!",
