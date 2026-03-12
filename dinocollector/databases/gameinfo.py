@@ -76,7 +76,7 @@ def select_random_creature(event_mode_enabled=False, event_active_type="", force
     available_creatures = {}
     for k, v in creature_library.items():
         version = v.get("version", "core")
-        if version in ["core", "asa"]:
+        if version in ["core", "asa", "boss"]:
             available_creatures[k] = v
         elif event_mode_enabled and version == event_active_type:
             available_creatures[k] = v
@@ -156,3 +156,4 @@ def select_random_creature(event_mode_enabled=False, event_active_type="", force
     }
     
     return embed, creature_data
+
