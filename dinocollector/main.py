@@ -56,6 +56,7 @@ class DinoCollector(
         # States
         self._saving = False
         self._save_retry = False
+        self._db_ready = asyncio.Event()
 
     def format_help_for_context(self, ctx: commands.Context):
         helpcmd = super().format_help_for_context(ctx)
@@ -387,6 +388,7 @@ class DinoCollector(
     async def initialize(self) -> None:
         await self.bot.wait_until_red_ready()
         self.db = await asyncio.to_thread(DB.from_file, cog_data_path(self) / "dinocollectordb.json")
+        self._db_ready.set()
         log.info("Config loaded")
 
     async def cog_check(self, ctx: commands.Context) -> bool:
