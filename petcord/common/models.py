@@ -302,7 +302,7 @@ class GuildSettings(Base):
     """Server-specific settings and user data."""
     users: Dict[int, User] = Field(default_factory=dict)
     game_is_enabled: bool = False
-    discord_server_timezone: str = "UTC"  # For accurate daily resets and time-based events
+    discord_server_timezone: str = "America/New_York"  # For accurate daily resets and time-based events
     active_holiday: Optional[str] = None  # e.g., "halloween", "christmas", etc.
 
     # Pet Finding Settings

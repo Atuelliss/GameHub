@@ -13,9 +13,11 @@ import discord
 from discord.ui import Button, View
 from redbot.core import commands
 from redbot.core.commands import Context
+from redbot.core.utils.views import SimpleMenu
 from typing import TYPE_CHECKING, Optional
 
 from ..abc import MixinMeta
+from ..views.setup_wizard import PetcordSetupView
 
 if TYPE_CHECKING:
     pass
@@ -332,13 +334,56 @@ async def is_admin(ctx: commands.Context) -> bool:
 
 class AdminCommands(MixinMeta):
     """Admin commands for Petcord configuration."""
-    
+
+    @commands.command(name="petsetup")
+    @commands.check(is_admin)
+    @commands.guild_only()
+    async def petsetup(self, ctx: Context) -> None:
+        """Interactive setup wizard for Petcord.
+
+        Walks you through the four core settings:
+        1. Notification channel
+        2. Default home capacity
+        3. Pet death toggle
+        4. Enable the game
+
+        Each step saves immediately. You can re-run this command at any time
+        to review or change settings. Use `pcset` commands for finer control.
+        """
+        conf = self.db.get_conf(ctx.guild)
+        view = PetcordSetupView(cog=self, conf=conf, author_id=ctx.author.id)
+        embed = view._build_embed()
+        view.message = await ctx.send(embed=embed, view=view)
+
     @commands.group(name="pcset", invoke_without_command=True)
     @commands.check(is_admin)
     @commands.guild_only()
     async def pcset(self, ctx: Context) -> None:
         """Petcord admin settings and commands."""
-        await ctx.send_help(ctx.command)
+        prefix = ctx.clean_prefix
+        cmds = sorted(ctx.command.commands, key=lambda c: c.name)
+        cmds_per_page = 10
+        total_pages = max(1, -(-len(cmds) // cmds_per_page))
+        pages = []
+        for i in range(0, max(1, len(cmds)), cmds_per_page):
+            chunk = cmds[i:i + cmds_per_page]
+            page_num = i // cmds_per_page + 1
+            embed = discord.Embed(
+                title="⚙️ Petcord Admin Commands",
+                description=f"Use `{prefix}pcset <command>` to run a command.",
+                color=discord.Color.blue(),
+            )
+            embed.set_footer(text=f"Page {page_num}/{total_pages}")
+            for cmd in chunk:
+                brief = cmd.brief or (cmd.help.splitlines()[0] if cmd.help else "No description.")
+                aliases = f" | aliases: {', '.join(cmd.aliases)}" if cmd.aliases else ""
+                embed.add_field(
+                    name=f"`{prefix}pcset {cmd.name}`{aliases}",
+                    value=brief,
+                    inline=False,
+                )
+            pages.append(embed)
+        await SimpleMenu(pages, disable_after_timeout=True).start(ctx)
     
     @pcset.command(name="enable")
     async def pcset_enable(self, ctx: Context) -> None:
@@ -1621,7 +1666,22 @@ class AdminCommands(MixinMeta):
         Blacklisted words cannot be used in pet names.
         """
         if ctx.invoked_subcommand is None:
-            await ctx.send_help(ctx.command)
+            prefix = ctx.clean_prefix
+            cmds = sorted(ctx.command.commands, key=lambda c: c.name)
+            embed = discord.Embed(
+                title="⛔ Petcord Blacklist Commands",
+                description=f"Use `{prefix}pcset blacklist <command>` to manage blocked pet names.",
+                color=discord.Color.red(),
+            )
+            for cmd in cmds:
+                brief = cmd.brief or (cmd.help.splitlines()[0] if cmd.help else "No description.")
+                aliases = f" | aliases: {', '.join(cmd.aliases)}" if cmd.aliases else ""
+                embed.add_field(
+                    name=f"`{prefix}pcset blacklist {cmd.name}`{aliases}",
+                    value=brief,
+                    inline=False,
+                )
+            await ctx.send(embed=embed)
 
     @pcset_blacklist.command(name="add")
     async def blacklist_add(self, ctx: Context, *, word: str) -> None:
@@ -1701,7 +1761,22 @@ class AdminCommands(MixinMeta):
     async def pcset_backup(self, ctx: Context) -> None:
         """Database backup management (Bot Owner only)."""
         if ctx.invoked_subcommand is None:
-            await ctx.send_help(ctx.command)
+            prefix = ctx.clean_prefix
+            cmds = sorted(ctx.command.commands, key=lambda c: c.name)
+            embed = discord.Embed(
+                title="🗃️ Petcord Backup Commands",
+                description=f"Use `{prefix}pcset backup <command>` to manage backups.",
+                color=discord.Color.orange(),
+            )
+            for cmd in cmds:
+                brief = cmd.brief or (cmd.help.splitlines()[0] if cmd.help else "No description.")
+                aliases = f" | aliases: {', '.join(cmd.aliases)}" if cmd.aliases else ""
+                embed.add_field(
+                    name=f"`{prefix}pcset backup {cmd.name}`{aliases}",
+                    value=brief,
+                    inline=False,
+                )
+            await ctx.send(embed=embed)
     
     @pcset_backup.command(name="list")
     async def backup_list(self, ctx: Context) -> None:
