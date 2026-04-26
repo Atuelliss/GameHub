@@ -12,3 +12,4 @@ from .species_guide import SpeciesGuideView
 from .leaderboard import LeaderboardView
 from .howto_views import HowToView
 from .gift_views import PetGiftView
+from .setup_wizard import PetcordSetupView
