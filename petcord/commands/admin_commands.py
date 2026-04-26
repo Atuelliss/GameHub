@@ -11,7 +11,7 @@ from zoneinfo import ZoneInfo, available_timezones
 
 import discord
 from discord.ui import Button, View
-from redbot.core import commands
+from redbot.core import bank, commands
 from redbot.core.commands import Context
 from redbot.core.utils.views import SimpleMenu
 from typing import TYPE_CHECKING, Optional
@@ -1061,6 +1061,16 @@ class AdminCommands(MixinMeta):
             inline=True
         )
         
+        # Petcoin conversion
+        currency_name = await bank.get_currency_name(ctx.guild)
+        conversion_status = "💱 Enabled" if conf.petcoin_conversion_enabled else "❌ Disabled"
+        embed.add_field(name="Petcoin Conversion", value=conversion_status, inline=True)
+        embed.add_field(
+            name="Conversion Rate",
+            value=f"{conf.petcoin_conversion_rate} Petcoin → 1 {currency_name}",
+            inline=True,
+        )
+
         # Blacklisted names count
         embed.add_field(
             name="Blocked Names",

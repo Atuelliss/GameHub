@@ -325,7 +325,9 @@ class GuildSettings(Base):
     # Admin Settings
     admin_role_id: Optional[int] = None
     disallowed_names: List[str] = Field(default_factory=lambda: list(DEFAULT_DISALLOWED_NAMES))
-    
+    petcoin_conversion_enabled: bool = False  # Whether petcoin can be converted to legendarycoin (future feature)
+    petcoin_conversion_rate: int = 10  # How many petcoin per discord currency (if enabled)
+
     # Channel Settings
     allowed_channel_id: Optional[int] = None  # Channel for notifications (deaths, etc.)
     
