@@ -1,11 +1,13 @@
 """
 Setup wizard view for Petcord cog.
 
-A linear, 4-step wizard that walks an admin through initial configuration:
+A linear, 6-step wizard that walks an admin through initial configuration:
     Step 1 — Notification channel
     Step 2 — Default home capacity
     Step 3 — Pet death toggle
-    Step 4 — Enable the game
+    Step 4 — Petcoin conversion toggle
+    Step 5 — Petcoin conversion rate
+    Step 6 — Enable the game
 """
 
 from __future__ import annotations
@@ -22,13 +24,15 @@ if TYPE_CHECKING:
     from ..common.models import GuildSettings
 
 
-TOTAL_STEPS = 4
+TOTAL_STEPS = 6
 
 STEP_TITLES: Dict[int, str] = {
     1: "Notification Channel",
     2: "Default Home Capacity",
     3: "Pet Death",
-    4: "Enable Game",
+    4: "Petcoin Conversion",
+    5: "Conversion Rate",
+    6: "Enable Game",
 }
 
 STEP_DESCRIPTIONS: Dict[int, str] = {
@@ -48,6 +52,17 @@ STEP_DESCRIPTIONS: Dict[int, str] = {
         "Home pets are not affected by this setting."
     ),
     4: (
+        "Allow players to **convert Petcoin into Discord economy credits**?\n\n"
+        "If enabled, players can exchange their Petcoin for the server's currency "
+        "using the conversion rate set in the next step."
+    ),
+    5: (
+        "Set the **conversion rate**: how many Petcoin are required to receive "
+        "1 Discord economy credit.\n\n"
+        "Example: a rate of 10 means 10 Petcoin → 1 credit.\n"
+        "Click **Set Rate** to enter a value."
+    ),
+    6: (
         "Everything is configured! **Enable the game** to let players start "
         "adopting and caring for pets.\n\n"
         "You can toggle this at any time with `pcset enable` / `pcset disable`."
@@ -58,6 +73,41 @@ STEP_DESCRIPTIONS: Dict[int, str] = {
 # ---------------------------------------------------------------------------
 # Modal
 # ---------------------------------------------------------------------------
+
+class _ConversionRateModal(discord.ui.Modal, title="Set Conversion Rate"):
+    rate: discord.ui.TextInput = discord.ui.TextInput(
+        label="Petcoin per Discord Credit",
+        placeholder="Enter a whole number (e.g. 10)",
+        min_length=1,
+        max_length=6,
+        required=True,
+    )
+
+    def __init__(self, wizard: "PetcordSetupView", current_value: int) -> None:
+        super().__init__()
+        self.wizard = wizard
+        self.rate.default = str(current_value)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        try:
+            value = int(self.rate.value.strip())
+        except ValueError:
+            await interaction.response.send_message(
+                "❌ Please enter a valid whole number.", ephemeral=True
+            )
+            return
+
+        if value < 1:
+            await interaction.response.send_message(
+                "❌ Conversion rate must be at least 1.", ephemeral=True
+            )
+            return
+
+        self.wizard.conf.petcoin_conversion_rate = value
+        self.wizard.cog.schedule_save()
+        self.wizard.completed[5] = f"{value} Petcoin → 1 credit"
+        await self.wizard._advance(interaction, from_modal=True)
+
 
 class _HomeCapacityModal(discord.ui.Modal, title="Set Home Capacity"):
     capacity: discord.ui.TextInput = discord.ui.TextInput(
@@ -165,6 +215,10 @@ class PetcordSetupView(View):
         if step == 3:
             return "Enabled ⚠️" if self.conf.pet_death_enabled else "Disabled 🛡️"
         if step == 4:
+            return "Enabled 💱" if self.conf.petcoin_conversion_enabled else "Disabled ❌"
+        if step == 5:
+            return f"{self.conf.petcoin_conversion_rate} Petcoin → 1 credit"
+        if step == 6:
             return "Enabled ✅" if self.conf.game_is_enabled else "Disabled ❌"
         return "—"
 
@@ -225,8 +279,19 @@ class PetcordSetupView(View):
             )
         elif step == 4:
             self._add_toggle_buttons(
-                field="game_is_enabled",
+                field="petcoin_conversion_enabled",
                 step=4,
+                enable_label="Enable Conversion",
+                disable_label="Disable Conversion",
+                enable_display="Enabled 💱",
+                disable_display="Disabled ❌",
+            )
+        elif step == 5:
+            self._add_conversion_rate_button()
+        elif step == 6:
+            self._add_toggle_buttons(
+                field="game_is_enabled",
+                step=6,
                 enable_label="Enable Game",
                 disable_label="Disable Game",
                 enable_display="Enabled ✅",
@@ -291,6 +356,21 @@ class PetcordSetupView(View):
         disable_btn.callback = disable_cb
         self.add_item(enable_btn)
         self.add_item(disable_btn)
+
+    def _add_conversion_rate_button(self) -> None:
+        btn = Button(
+            label="Set Rate",
+            style=discord.ButtonStyle.primary,
+            emoji="💱",
+            row=0,
+        )
+
+        async def cb(interaction: discord.Interaction) -> None:
+            modal = _ConversionRateModal(self, self.conf.petcoin_conversion_rate)
+            await interaction.response.send_modal(modal)
+
+        btn.callback = cb
+        self.add_item(btn)
 
     def _add_back_button(self) -> None:
         btn = Button(label="◀ Back", style=discord.ButtonStyle.secondary, row=1)
