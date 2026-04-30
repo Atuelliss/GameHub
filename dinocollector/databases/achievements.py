@@ -211,27 +211,27 @@ achievement_library = {
     # Explorer Log Achievements
     "log_25_percent": {
         "name": "Novice Explorer",
-        "description": "Discovered 25% of all dinosaur species!",
+        "description": "Discovered 25% of all dinosaur species in the full log (including event species)!",
         "reward": 150,
         "hint": "Fill your explorer log."
     },
     "log_50_percent": {
         "name": "Seasoned Explorer",
-        "description": "Discovered 50% of all dinosaur species!",
+        "description": "Discovered 50% of all dinosaur species in the full log (including event species)!",
         "reward": 300,
         "hint": "Halfway there!"
     },
     "log_75_percent": {
         "name": "Expert Explorer",
-        "description": "Discovered 75% of all dinosaur species!",
+        "description": "Discovered 75% of all dinosaur species in the full log (including event species)!",
         "reward": 500,
         "hint": "Almost complete!"
     },
     "log_100_percent": {
         "name": "Master Paleontologist",
-        "description": "Discovered every dinosaur species!",
+        "description": "Discovered every dinosaur species in the full log (including event species)!",
         "reward": 1000,
-        "hint": "Gotta catch 'em all!"
+        "hint": "Gotta catch 'em all in the full log, including event species!"
     },
     # Missing Modifier Achievements
     "first_withered": {

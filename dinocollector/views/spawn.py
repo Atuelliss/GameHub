@@ -226,7 +226,5 @@ class SpawnView(discord.ui.View):
                 
                 try:
                     await self.message.edit(embed=embed, view=None)
-                except discord.NotFound:
-                    pass # Message was deleted
-                except discord.HTTPException:
-                    pass
+                except Exception:
+                    pass  # Message deleted, or network unavailable during timeout

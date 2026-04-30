@@ -756,6 +756,7 @@ class DinoCollector(
             "**dccommands** - List all available commands.\n"
             "**dcinv** - View your inventory.\n"
             "**dclog** - View your Explorer Log.\n"
+            "**dclog sell** - Sell a complete non-event log (event species are bonus).\n"
             "**dcstats** - View your stats.\n"
             "**dcsell <item/all/rarity>** - Sell dinos.\n"
             "**dcbuddy set <id> / clear** - Manage your buddy dino.\n"

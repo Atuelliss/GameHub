@@ -51,6 +51,8 @@ class GuildSettings(Base):
     inventory_per_upgrade: int = 10
     maximum_upgrade_amount: int = 23
     price_lure: int = 200
+    price_rare_lure: int = 500
+    price_super_lure: int = 750
     lure_cooldown: int = 3600     # 1 hour in seconds
     buddy_bonus_enabled: bool = True
     explorer_log_value: int = 7500

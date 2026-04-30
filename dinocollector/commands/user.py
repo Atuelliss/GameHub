@@ -105,7 +105,10 @@ class User(MixinMeta):
             chunk = all_creatures[start:end]
             
             embed = discord.Embed(title="📖 Explorer Log", color=discord.Color.gold())
-            embed.description = f"**Progress:** {caught_count}/{total_creatures} Species Caught\n\n"
+            embed.description = (
+                f"**Progress:** {caught_count}/{total_creatures} Species Caught\n"
+                "Sell completion requires all non-event species. Event species are bonus entries.\n\n"
+            )
             
             page_lines = []
             for i, creature in enumerate(chunk, start=start + 1):
@@ -162,7 +165,10 @@ class User(MixinMeta):
         missing = [name for name in required_creatures if name not in caught_names]
         
         if missing:
-            await ctx.send("You still have missing slots in your Explorer Log!!! Hunt for more first!")
+            await ctx.send(
+                "Your Explorer Log is not complete for non-event species yet. "
+                "Event species are bonus and do not block selling."
+            )
             return
             
         reward = conf.explorer_log_value
@@ -173,7 +179,10 @@ class User(MixinMeta):
         view.children[1].label = "No"
         
         msg = await ctx.send(
-            f"Are you sure you wish to sell your Explorer Log for {reward} DinoCoins?",
+            (
+                f"Are you sure you wish to sell your Explorer Log for {reward} DinoCoins?\n"
+                "Sell checks only non-event species. Event species are bonus and not required."
+            ),
             view=view
         )
         view.message = msg

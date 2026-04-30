@@ -8,6 +8,13 @@ creature_library = {
         "value": common_value,
         "image": "https://www.dododex.com/media/creature/achatina.png"
     },
+    "acrocanthosaurus": {
+        "name": "Acrocanthosaurus",
+        "version": "asa",
+        "rarity": "rare",
+        "value": rare_value,
+        "image": "https://www.dododex.com/media/creature/acrocanthosaurus.png"
+    },
     "allosaurus": {
         "name": "Allosaurus",
         "version": "core",
@@ -99,6 +106,20 @@ creature_library = {
         "value": rare_value,
         "image": "https://www.dododex.com/media/creature/astrodelphis.png"
     },
+    "attack_drone": {
+        "name": "Attack Drone",
+        "version": "core",
+        "rarity": "uncommon",
+        "value": uncommon_value,
+        "image": "https://www.dododex.com/media/creature/attackdrone.png"
+    },
+    "aureliax": {
+        "name": "Aureliax",
+        "version": "asa",
+        "rarity": "super_rare",
+        "value": super_rare_value,
+        "image": "https://www.dododex.com/media/creature/aureliax.png"
+    },
     "baryonyx": {
         "name": "Baryonyx",
         "version": "core",
@@ -140,6 +161,13 @@ creature_library = {
         "rarity": "common",
         "value": common_value,
         "image": "https://www.dododex.com/media/creature/brontosaurus.png"
+    },
+    "broodmother_lystrix": {
+        "name": "Broodmother Lystrix(boss)",
+        "version": "boss",
+        "rarity": "legendary",
+        "value": legendary_value,
+        "image": "https://www.dododex.com/media/creature/broodmotherlysrix.png"
     },
     "bulbdog": {
         "name": "Bulbdog",
@@ -218,12 +246,26 @@ creature_library = {
         "value": legendary_value,
         "image": "https://www.dododex.com/media/creature/cosmo.png"
     },
+    "cryolophosaurus": {
+        "name": "Cryolophosaurus",
+        "version": "asa",
+        "rarity": "semi_rare",
+        "value": semi_rare_value,
+        "image": "https://www.dododex.com/media/creature/cryolophosaurus.png"
+    },
     "daeodon": {
         "name": "Daeodon",
         "version": "core",
         "rarity": "uncommon",
         "value": uncommon_value,
         "image": "https://www.dododex.com/media/creature/daeodon.png"
+    },
+    "defense_unit": {
+        "name": "Defense Unit",
+        "version": "core",
+        "rarity": "common",
+        "value": common_value,
+        "image": "https://www.dododex.com/media/creature/defenseunit.png"
     },
     "deinonychus": {
         "name": "Deinonychus",
@@ -343,6 +385,13 @@ creature_library = {
         "rarity": "common",
         "value": common_value,
         "image": "https://www.dododex.com/media/creature/doedicurus.png"
+    },
+    "dragon": {
+        "name": "Dragon(boss)",
+        "version": "boss",
+        "rarity": "legendary",
+        "value": legendary_value,
+        "image": "https://www.dododex.com/media/creature/dragon.png"
     },
     "drakeling": {
         "name": "DrakeLing",
@@ -491,6 +540,20 @@ creature_library = {
         "value": uncommon_value,
         "image": "https://www.dododex.com/media/creature/giantbee.png"
     },
+    "gigadesmodus": {
+        "name": "Gigadesmodus(boss)",
+        "version": "boss",
+        "rarity": "very_rare",
+        "value": very_rare_value,
+        "image": "https://www.dododex.com/media/creature/gigadesmodus.png"
+    },
+    "gloon": {
+        "name": "Gloon",
+        "version": "asa",
+        "rarity": "uncommon",
+        "value": uncommon_value,
+        "image": "https://www.dododex.com/media/creature/gloon.png"
+    },
     "bison": {
         "name": "Bison",
         "version": "asa",
@@ -526,6 +589,20 @@ creature_library = {
         "value": common_value,
         "image": "https://www.dododex.com/media/creature/glowtail.png"
     },
+    "grand_tortugar": {
+        "name": "Grand Tortugar",
+        "version": "asa",
+        "rarity": "very_rare",
+        "value": very_rare_value,
+        "image": "https://www.dododex.com/media/creature/grandtortugar.png"
+    },
+    "grendel": {
+        "name": "Grendel(boss)",
+        "version": "boss",
+        "rarity": "legendary",
+        "value": legendary_value,
+        "image": "https://www.dododex.com/media/creature/grendel.png"
+    },    
     "griffin": {
         "name": "Griffin",
         "version": "core",
@@ -545,7 +622,7 @@ creature_library = {
         "version": "core",
         "rarity": "uncommon",
         "value": uncommon_value,
-        "image": "https://www.dododex.com/media/creature/hesperonis.png"
+        "image": "https://www.dododex.com/media/creature/hesperornis.png"
     },
     "hyaenodon": {
         "name": "Hyaenodon",
@@ -553,6 +630,13 @@ creature_library = {
         "rarity": "common",
         "value": common_value,
         "image": "https://www.dododex.com/media/creature/hyaenodon.png"
+    },
+    "hydra": {
+        "name": "Hydra(boss)",
+        "version": "boss",
+        "rarity": "legendary",
+        "value": legendary_value,
+        "image": "https://www.dododex.com/media/creature/hydra.png"
     },
     "ichthyosaurus": {
         "name": "Ichthyosaurus",
@@ -630,20 +714,34 @@ creature_library = {
         "rarity": "semi_rare",
         "value": semi_rare_value,
         "image": "https://www.dododex.com/media/creature/liopleurodon.png"
-    },  
+    },
+    "lost_king": {
+        "name": "Lost King(boss)",
+        "version": "boss",
+        "rarity": "legendary",
+        "value": legendary_value,
+        "image": "https://www.dododex.com/media/creature/lostking.png"
+    },
+    "lost_queen": {
+        "name": "Lost Queen(boss)",
+        "version": "boss",
+        "rarity": "legendary",
+        "value": legendary_value,
+        "image": "https://www.dododex.com/media/creature/lostqueen.png"
+    },
     "love_bird": {
         "name": "Love Bird",
         "version": "valentines",
         "rarity": "event",
         "value": event_value,
-        "image": None
+        "image": "https://ark.wiki.gg/images/thumb/Dossier_Featherlight.png/800px-Dossier_Featherlight.png?44a4cc"
     },  
     "love_bug": {
         "name": "Love Bug",
         "version": "valentines",
         "rarity": "event",
         "value": event_value,
-        "image": None
+        "image": "https://ark.wiki.gg/images/thumb/Love_Bug_in_game.jpg/1024px-Love_Bug_in_game.jpg?9cc52f"
     },
     "lymantria": {
         "name": "Lymantria",
@@ -679,6 +777,13 @@ creature_library = {
         "rarity": "semi_rare",
         "value": semi_rare_value,
         "image": "https://www.dododex.com/media/creature/magmasaur.png"
+    },
+    "malwyn": {
+        "name": "Malwyn",
+        "version": "asa",
+        "rarity": "semi_rare",
+        "value": semi_rare_value,
+        "image": "https://www.dododex.com/media/creature/malwyn.png"
     },
     "mammoth": {
         "name": "Mammoth",
@@ -743,6 +848,13 @@ creature_library = {
         "value": uncommon_value,
         "image": "https://www.dododex.com/media/creature/megalosaurus.png"
     },
+    "megapithecus": {
+        "name": "Megapithecus(boss)",
+        "version": "boss",
+        "rarity": "legendary",
+        "value": legendary_value,
+        "image": "https://www.dododex.com/media/creature/megapithecus.png"
+    },
     "megaraptor": {
         "name": "Megaraptor",
         "version": "asa",
@@ -771,6 +883,13 @@ creature_library = {
         "value": common_value,
         "image": "https://www.dododex.com/media/creature/microraptor.png"
     },
+    "minotaur": {
+        "name": "Minotaur",
+        "version": "asa",
+        "rarity": "super_rare",
+        "value": super_rare_value,
+        "image": "https://www.dododex.com/media/creature/minotaur.png"
+    },
     "morellatops": {
         "name": "Morellatops",
         "version": "core",
@@ -792,12 +911,40 @@ creature_library = {
         "value": common_value,
         "image": "https://www.dododex.com/media/creature/moschops.png"
     },
+    "nameless": {
+        "name": "Nameless",
+        "version": "core",
+        "rarity": "uncommon",
+        "value": uncommon_value,
+        "image": "https://www.dododex.com/media/creature/nameless.png"
+    },
+    "natrix": {
+        "name": "Natrix",
+        "version": "boss",
+        "rarity": "super_rare",
+        "value": super_rare_value,
+        "image": "https://ark.wiki.gg/images/thumb/NatrixtheDevious.jpg/800px-NatrixtheDevious.jpg?283d11"
+    },
+    "neophyte": {
+        "name": "Neophyte",
+        "version": "asa",
+        "rarity": "semi_rare",
+        "value": semi_rare_value,
+        "image": "https://www.dododex.com/media/creature/neophyte.png"
+    },
     "noglin": {
         "name": "Noglin",
         "version": "core",
         "rarity": "rare",
         "value": rare_value,
         "image": "https://www.dododex.com/media/creature/noglin.png"
+    },
+    "nunatak": {
+        "name": "Nunatak(boss)",
+        "version": "boss",
+        "rarity": "legendary",
+        "value": legendary_value,
+        "image": "https://www.dododex.com/media/creature/nunatak.png"
     },
     "oasisaur": {
         "name": "Oasisaur",
@@ -826,6 +973,13 @@ creature_library = {
         "rarity": "common",
         "value": common_value,
         "image": "https://www.dododex.com/media/creature/otter.png"
+    },
+    "overseer": {
+        "name": "Overseer(boss)",
+        "version": "boss",
+        "rarity": "legendary",
+        "value": legendary_value,
+        "image": "https://www.dododex.com/media/creature/overseer.png"
     },
     "oviraptor": {
         "name": "Oviraptor",
@@ -981,19 +1135,19 @@ creature_library = {
         "value": rare_value,
         "image": "https://www.dododex.com/media/creature/reaper.png"
     },
+    "revenant": {
+        "name": "Revenant",
+        "version": "core",
+        "rarity": "rare",
+        "value": rare_value,
+        "image": "https://www.dododex.com/media/creature/revenant.png"
+    },
     "rex": {
         "name": "Rex",
         "version": "core",
         "rarity": "semi_rare",
         "value": semi_rare_value,
         "image": "https://www.dododex.com/media/creature/rex.png"
-    },
-    "rex_dodo": {
-        "name": "DodoRex",
-        "version": "halloween",
-        "rarity": "event",
-        "value": event_value,
-        "image": "https://www.dododex.com/media/creature/dodorex.png"
     },
     "rhyniognatha": {
         "name": "Rhyniognatha",
@@ -1065,6 +1219,20 @@ creature_library = {
         "value": uncommon_value,
         "image": "https://www.dododex.com/media/creature/sarco.png"
     },
+    "scout": {
+        "name": "Scout",
+        "version": "core",
+        "rarity": "common",
+        "value": common_value,
+        "image": "https://www.dododex.com/media/creature/scout.png"
+    },
+    "seeker": {
+        "name": "Seeker",
+        "version": "core",
+        "rarity": "uncommon",
+        "value": uncommon_value,
+        "image": "https://www.dododex.com/media/creature/seeker.png"
+    },
     "shadowmane": {
         "name": "Shadowmane",
         "version": "core",
@@ -1099,6 +1267,13 @@ creature_library = {
         "rarity": "common",
         "value": common_value,
         "image": "https://www.dododex.com/media/creature/snowowl.png"
+    },
+    "solwyn": {
+        "name": "Solwyn",
+        "version": "asa",
+        "rarity": "semi_rare",
+        "value": semi_rare_value,
+        "image": "https://www.dododex.com/media/creature/solwyn.png"
     },
     "spinosaurus": {
         "name": "Spinosaurus",
@@ -1184,6 +1359,13 @@ creature_library = {
         "value": common_value,
         "image": "https://www.dododex.com/media/creature/terrorbird.png"
     },
+    "thanatos": {
+        "name": "Thanatos(boss)",
+        "version": "boss",
+        "rarity": "legendary",
+        "value": legendary_value,
+        "image": "https://ark.wiki.gg/images/thumb/GodofDeath.jpg/800px-GodofDeath.jpg?bd8c98"
+    },
     "therizinosaurus": {
         "name": "Therizinosaurus",
         "version": "core",
@@ -1191,12 +1373,26 @@ creature_library = {
         "value": uncommon_value,
         "image": "https://www.dododex.com/media/creature/therizinosaurus.png"
     },
+    "thodes": {
+        "name": "Thodes(boss)",
+        "version": "boss",
+        "rarity": "super_rare",
+        "value": super_rare_value,
+        "image": "https://ark.wiki.gg/images/thumb/ThodestheWidowmaker.jpg/800px-ThodestheWidowmaker.jpg?f746f2"
+    },
     "thorny_dragon": {
         "name": "Thorny Dragon",
         "version": "core",
         "rarity": "uncommon",
         "value": uncommon_value,
         "image": "https://www.dododex.com/media/creature/thornydragon.png"
+    },
+    "thrall": {
+        "name": "Thrall",
+        "version": "asa",
+        "rarity": "semi_rare",
+        "value": semi_rare_value,
+        "image": "https://www.dododex.com/media/creature/thrall.png"
     },
     "thylacoleo": {
         "name": "Thylacoleo",
