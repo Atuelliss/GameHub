@@ -3,6 +3,7 @@ import asyncio
 import random
 import time
 import logging
+import aiohttp
 import discord
 from discord.ext import tasks
 
@@ -95,6 +96,8 @@ class TaskLoops(metaclass=CompositeMetaClass):
                             log.warning(f"Missing permissions to send in {target_channel.name} ({guild.name})")
                         except discord.HTTPException as e:
                             log.warning(f"HTTP error sending spawn in {guild.name}: {e}")
+                        except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
+                            log.warning(f"Network error sending spawn in {guild.name}: {e}")
             except Exception as e:
                 log.exception(f"Unexpected error in spawn loop for guild {guild.name} ({guild.id})", exc_info=e)
 
