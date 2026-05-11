@@ -176,6 +176,13 @@ creature_library = {
         "value": common_value,
         "image": "https://www.dododex.com/media/creature/bulbdog.png"
     },
+    "burrowbuck" : {
+        "name": "Burrowbuck",
+        "version": "asa",
+        "rarity": "semi_rare",
+        "value": semi_rare_value,
+        "image": "https://www.dododex.com/media/creature/burrowbuck.png"
+    },
     "carbonemys": {
         "name": "Carbonemys",
         "version": "core",
@@ -1009,6 +1016,13 @@ creature_library = {
         "value": common_value,
         "image": "https://www.dododex.com/media/creature/pachyrhinosaurus.png"
     },
+    "palaeoctopus": {
+        "name": "Palaeoctopus",
+        "version": "asa",
+        "rarity": "semi_rare",
+        "value": semi_rare_value,
+        "image": "https://www.dododex.com/media/creature/palaeoctopus.png"
+    },
     "paraceratherium": {
         "name": "Paraceratherium",
         "version": "core",
@@ -1400,6 +1414,13 @@ creature_library = {
         "rarity": "uncommon",
         "value": uncommon_value,
         "image": "https://www.dododex.com/media/creature/thylacoleo.png"
+    },
+    "tidepup": {
+        "name": "Tidepup",
+        "version": "asa",
+        "rarity": "uncommon",
+        "value": uncommon_value,
+        "image": "https://www.dododex.com/media/creature/tidepup.png"
     },
     "titan_desert": {
         "name": "Desert Titan",
