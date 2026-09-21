@@ -1,0 +1,16 @@
+{
+  "author": ["Jayar"],
+  "description": "An Ark/Pokemon-inspired collector game. Catch, trade, sell, dinos for DinoCoins and Explorer Log notes.",
+  "disabled": false,
+  "end_user_data_statement": "",
+  "hidden": false,
+  "install_msg": "Thank you for installing! Run [p]dcsetup to get started.",
+  "min_bot_version": "3.5.3",
+  "min_python_version": [3, 10, 0],
+  "permissions": ["administrator"],
+  "required_cogs": {},
+  "requirements": ["pydantic"],
+  "short": "",
+  "tags": [],
+  "type": "COG"
+}

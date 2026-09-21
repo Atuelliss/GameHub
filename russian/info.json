@@ -1,0 +1,16 @@
+{
+  "author": ["Jayar"],
+  "description": "A simple game of Russian Roulette",
+  "disabled": false,
+  "end_user_data_statement": "",
+  "hidden": false,
+  "install_msg": "Thank you for installing! Note: The bot needs 'Manage Messages' permission for optimal gameplay.",
+  "min_bot_version": "3.5.3",
+  "min_python_version": [3, 10, 0],
+  "permissions": ["manage_messages"],
+  "required_cogs": {},
+  "requirements": ["pydantic"],
+  "short": "To bang, or not to bang.",
+  "tags": ["prototype"],
+  "type": "COG"
+}
