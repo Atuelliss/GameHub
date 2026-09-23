@@ -29,6 +29,7 @@ class Russian(
 
         # States
         self._saving = False
+        self._save_retry = False
         self.active_games = {}  # Track active games to prevent multiple games per user
 
     def format_help_for_context(self, ctx: commands.Context):
@@ -61,11 +62,16 @@ class Russian(
     def save(self) -> None:
         async def _save():
             if self._saving:
+                self._save_retry = True
                 return
             try:
                 self._saving = True
                 db_path = cog_data_path(self) / "db.json"  # Specify a filename
-                await asyncio.to_thread(self.db.to_file, db_path)
+                while True:
+                    self._save_retry = False
+                    await asyncio.to_thread(self.db.to_file, db_path)
+                    if not self._save_retry:
+                        break
             except Exception as e:
                 log.exception("Failed to save config", exc_info=e)
             finally:

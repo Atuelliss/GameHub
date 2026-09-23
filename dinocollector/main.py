@@ -406,11 +406,10 @@ class DinoCollector(
         return True
 
     def save(self) -> None:
-        if self._saving:
-            self._save_retry = True
-            return
-
         async def _save():
+            if self._saving:
+                self._save_retry = True
+                return
             try:
                 self._saving = True
                 while True:

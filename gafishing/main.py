@@ -30,6 +30,7 @@ class GreenacresFishing(
 
         # States
         self._saving = False
+        self._save_retry = False
         
         # In-memory debug log for fish catches (avoids writing to filesystem)
         self.debug_log: list = []
@@ -143,10 +144,15 @@ class GreenacresFishing(
     def save(self) -> None:
         async def _save():
             if self._saving:
+                self._save_retry = True
                 return
             try:
                 self._saving = True
-                await asyncio.to_thread(self.db.to_file, cog_data_path(self) / "db.json")
+                while True:
+                    self._save_retry = False
+                    await asyncio.to_thread(self.db.to_file, cog_data_path(self) / "db.json")
+                    if not self._save_retry:
+                        break
             except Exception as e:
                 log.exception("Failed to save config", exc_info=e)
             finally:

@@ -164,7 +164,7 @@ class CrimeTime(DatabaseCommands, AdminCommands, commands.Cog):
 
         # States
         self._saving = False
-        self._save_pending = False
+        self._save_retry = False
         
         # Background task handle
         self.blackmarket_task: asyncio.Task | None = None
@@ -295,22 +295,21 @@ class CrimeTime(DatabaseCommands, AdminCommands, commands.Cog):
         return max(0, int(remaining))
 
     def save(self) -> None:
-        self._save_pending = True
-        
         async def _save():
             if self._saving:
+                self._save_retry = True
                 return
             try:
                 self._saving = True
-                self._save_pending = False
-                await asyncio.to_thread(self.db.to_file, cog_data_path(self) / "db.json")
+                while True:
+                    self._save_retry = False
+                    await asyncio.to_thread(self.db.to_file, cog_data_path(self) / "db.json")
+                    if not self._save_retry:
+                        break
             except Exception as e:
                 log.exception("Failed to save config", exc_info=e)
             finally:
                 self._saving = False
-                # Check if another save was requested while we were saving
-                if self._save_pending:
-                    asyncio.create_task(_save())
 
         asyncio.create_task(_save())
 
