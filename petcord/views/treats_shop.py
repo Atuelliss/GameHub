@@ -560,10 +560,12 @@ class TreatPurchaseConfirmView(View):
             icon_url=interaction.user.display_avatar.url
         )
         
-        try:
-            await self.parent_view.message.edit(embed=embed, view=self.parent_view)
-        except Exception:
-            pass
+        # Skip if the user has already moved on from the parent view
+        if not self.parent_view.is_finished():
+            try:
+                await self.parent_view.message.edit(embed=embed, view=self.parent_view)
+            except Exception:
+                pass
         
         self.stop()
 
@@ -946,10 +948,12 @@ class UseTreatConfirmView(View):
             icon_url=interaction.user.display_avatar.url
         )
         
-        try:
-            await self.parent_view.message.edit(embed=embed, view=self.parent_view)
-        except Exception:
-            pass
+        # Skip if the user has already moved on from the parent view
+        if not self.parent_view.is_finished():
+            try:
+                await self.parent_view.message.edit(embed=embed, view=self.parent_view)
+            except Exception:
+                pass
         
         self.stop()
 
@@ -1132,10 +1136,12 @@ class BuyAmbrosiaConfirmView(View):
             name=interaction.user.display_name,
             icon_url=interaction.user.display_avatar.url
         )
-        try:
-            await self.parent_view.message.edit(embed=embed, view=self.parent_view)
-        except Exception:
-            pass
+        # Skip if the user has already moved on from the parent view
+        if not self.parent_view.is_finished():
+            try:
+                await self.parent_view.message.edit(embed=embed, view=self.parent_view)
+            except Exception:
+                pass
 
         self.stop()
 
@@ -1335,10 +1341,12 @@ class AmbrosiaConfirmView(View):
             name=interaction.user.display_name,
             icon_url=interaction.user.display_avatar.url
         )
-        try:
-            await self.parent_view.message.edit(embed=embed, view=self.parent_view)
-        except Exception:
-            pass
+        # Skip if the user has already moved on from the parent view
+        if not self.parent_view.is_finished():
+            try:
+                await self.parent_view.message.edit(embed=embed, view=self.parent_view)
+            except Exception:
+                pass
 
         self.stop()
 

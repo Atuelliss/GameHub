@@ -66,6 +66,13 @@ def initialize_daily_tracking(user_data: "User") -> None:
     )
 
 
+def reset_daily_tracking(user_data: "User") -> None:
+    """Clear daily tracking when the current pet leaves (graduated, died, abandoned, removed)."""
+    user_data.current_day_start = 0.0
+    user_data.current_day_scores = None
+    user_data.care_history = []
+
+
 def update_daily_tracking(user_data: "User", pet: "Pet", action: str) -> None:
     """Update tracking based on action performed."""
     if not user_data.current_day_scores:

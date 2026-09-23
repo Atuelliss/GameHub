@@ -376,14 +376,27 @@ class WardrobeButton(Button):
                 ephemeral=True
             )
             return
-        
+
+        # Stop the Home view so its timeout can't overwrite the wardrobe screen,
+        # and keep a fresh (not yet started) Home view for the Back button
+        from ..views.home_views import HomeListView
+        view.stop()
+        home_view = HomeListView(
+            cog=view.cog,
+            user_data=view.user_data,
+            author_id=view.author_id,
+            guild_settings=view.guild_settings,
+            author=view.author,
+        )
+        home_view.message = view.message
+
         # Create pet selection view
         wardrobe_view = WardrobePetSelectView(
             cog=view.cog,
             author=view.author,
             user_data=view.user_data,
             guild_settings=view.guild_settings,
-            parent_view=view,
+            parent_view=home_view,
         )
         
         embed = wardrobe_view.build_embed()
@@ -475,7 +488,18 @@ class WardrobePetSelectView(View):
             return
         
         selected_pet, location = pets[selected_idx]
-        
+
+        # Stop this view and keep a fresh copy for the Back button
+        self.stop()
+        pet_select_view = WardrobePetSelectView(
+            cog=self.cog,
+            author=self.author,
+            user_data=self.user_data,
+            guild_settings=self.guild_settings,
+            parent_view=self.parent_view,
+        )
+        pet_select_view.message = self.message
+
         # Open wardrobe for this pet
         wardrobe_view = WardrobeView(
             cog=self.cog,
@@ -484,7 +508,7 @@ class WardrobePetSelectView(View):
             guild_settings=self.guild_settings,
             pet=selected_pet,
             pet_location=location,
-            parent_view=self,
+            parent_view=pet_select_view,
         )
         
         embed = wardrobe_view.build_embed()
@@ -625,7 +649,20 @@ class WardrobeView(View):
         # interaction.data is guaranteed by Discord when callback fires from Select
         data = interaction.data or {}
         slot = data.get("values", [""])[0]
-        
+
+        # Stop this view and keep a fresh copy to return to
+        self.stop()
+        wardrobe_view = WardrobeView(
+            cog=self.cog,
+            author=self.author,
+            user_data=self.user_data,
+            guild_settings=self.guild_settings,
+            pet=self.pet,
+            pet_location=self.pet_location,
+            parent_view=self.parent_view,
+        )
+        wardrobe_view.message = self.message
+
         # Open slot item selection view
         slot_view = SlotItemSelectView(
             cog=self.cog,
@@ -635,7 +672,7 @@ class WardrobeView(View):
             pet=self.pet,
             pet_location=self.pet_location,
             slot=slot,
-            parent_view=self,
+            parent_view=wardrobe_view,
         )
         
         embed = slot_view.build_embed()
@@ -805,6 +842,7 @@ class SlotItemSelectView(View):
         if success:
             self.cog.schedule_save()
             # Return to main wardrobe view
+            self.stop()
             await self.parent_view.refresh(interaction)
         else:
             await interaction.response.send_message(f"❌ {message}", ephemeral=True)
@@ -903,6 +941,7 @@ class BackToHomeButton(Button):
     
     async def callback(self, interaction: discord.Interaction) -> None:
         # Return to the home view
+        self.view.stop()
         embed = self.home_view.build_embed()
         await interaction.response.edit_message(embed=embed, view=self.home_view)
 
@@ -920,6 +959,7 @@ class BackToPetSelectButton(Button):
         self.pet_select_view = pet_select_view
     
     async def callback(self, interaction: discord.Interaction) -> None:
+        self.view.stop()
         embed = self.pet_select_view.build_embed()
         await interaction.response.edit_message(embed=embed, view=self.pet_select_view)
 
@@ -937,6 +977,7 @@ class BackToWardrobeButton(Button):
         self.wardrobe_view = wardrobe_view
     
     async def callback(self, interaction: discord.Interaction) -> None:
+        self.view.stop()
         # Rebuild wardrobe view in case equipment changed
         self.wardrobe_view.clear_items()
         self.wardrobe_view._build_slot_select()
@@ -999,6 +1040,7 @@ class RemoveFromSlotButton(Button):
         if success:
             view.cog.schedule_save()
             # Return to main wardrobe view
+            view.stop()
             await view.parent_view.refresh(interaction)
         else:
             await interaction.response.send_message(f"❌ {message}", ephemeral=True)

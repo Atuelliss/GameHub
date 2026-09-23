@@ -281,13 +281,24 @@ class MemorialSelect(Select):
                 inline=False
             )
         
+        # Stop the list view so its timeout can't overwrite the detail screen,
+        # and keep a fresh list view (same page) for Back to List
+        view.stop()
+        list_view = MemorialView(
+            cog=view.cog,
+            user_data=view.user_data,
+            author_id=view.author_id,
+            current_page=view.current_page
+        )
+        list_view.message = view.message
+
         # Create a sub-view for this pet
         detail_view = MemorialDetailView(
             cog=view.cog,
             user_data=view.user_data,
             author_id=view.author_id,
             memorial_index=actual_index,
-            parent_view=view
+            parent_view=list_view
         )
         
         await interaction.response.edit_message(embed=embed, view=detail_view)

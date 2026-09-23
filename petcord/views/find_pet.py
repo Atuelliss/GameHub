@@ -247,13 +247,27 @@ class PetFoundView(View):
     @discord.ui.button(label="Back", emoji="◀️", style=discord.ButtonStyle.secondary, row=0)
     async def back_button(self, interaction: discord.Interaction, button: Button):
         """Go back to main menu - with cooldown confirmation."""
+        # Stop this view so its timeout can't overwrite the confirmation screen,
+        # and keep a fresh copy (same button states) for Cancel to return to
+        self.stop()
+        offer_view = PetFoundView(
+            cog=self.cog,
+            user_data=self.user_data,
+            guild_settings=self.guild_settings,
+            offered_pet=self.offered_pet,
+            author_id=self.author_id
+        )
+        offer_view.adopt_button.disabled = self.adopt_button.disabled
+        offer_view.pass_button.disabled = self.pass_button.disabled
+        offer_view.message = self.message
+
         # Show confirmation view warning about cooldown
         confirm_view = BackConfirmView(
             cog=self.cog,
             user_data=self.user_data,
             guild_settings=self.guild_settings,
             author_id=self.author_id,
-            parent_view=self,
+            parent_view=offer_view,
             original_message=self.message
         )
         

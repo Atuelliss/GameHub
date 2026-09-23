@@ -414,20 +414,31 @@ class HowToButton(Button):
         from .howto_views import HowToView
         
         view: StatsView = self.view
-        
+
         # Build current embed to return to
         return_embed = view.build_embed()
         return_embed.set_author(
             name=interaction.user.display_name,
             icon_url=interaction.user.display_avatar.url
         )
-        
+
+        # Stop this view so its timeout can't overwrite the How-To screen,
+        # and keep a fresh Stats view for the Back button
+        view.stop()
+        return_view = StatsView(
+            cog=view.cog,
+            user_data=view.user_data,
+            guild_settings=view.guild_settings,
+            author_id=view.author_id
+        )
+        return_view.message = view.message
+
         # Create How-To view with return capability
         howto_view = HowToView(
             cog=view.cog,
             author_id=view.author_id,
             guild_settings=view.guild_settings,
-            return_view=view,
+            return_view=return_view,
             return_embed=return_embed
         )
         

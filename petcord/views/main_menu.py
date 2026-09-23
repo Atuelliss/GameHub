@@ -991,11 +991,13 @@ class OwnerSleepConfirmView(View):
             icon_url=interaction.user.display_avatar.url
         )
         
-        try:
-            await self.parent_view.message.edit(embed=embed, view=self.parent_view)
-        except Exception:
-            pass
-        
+        # Skip if the user has already moved on from the main menu
+        if not self.parent_view.is_finished():
+            try:
+                await self.parent_view.message.edit(embed=embed, view=self.parent_view)
+            except Exception:
+                pass
+
         self.stop()
     
     @discord.ui.button(label="Cancel", emoji="❌", style=discord.ButtonStyle.secondary)
@@ -1165,8 +1167,8 @@ class AbandonConfirmView(View):
         user_data.current_pet = None
         
         # Clear any daily tracking
-        user_data.current_day_scores = None
-        user_data.care_history = []
+        from ..commands.helper_functions import reset_daily_tracking
+        reset_daily_tracking(user_data)
         
         # Save changes
         self.parent_view.cog.schedule_save()
@@ -1216,7 +1218,8 @@ class AbandonConfirmView(View):
             icon_url=interaction.user.display_avatar.url
         )
         
-        if self.parent_view.message:
+        # Skip if the user has already moved on from the main menu
+        if self.parent_view.message and not self.parent_view.is_finished():
             try:
                 await self.parent_view.message.edit(embed=embed, view=self.parent_view)
             except (discord.NotFound, discord.HTTPException):

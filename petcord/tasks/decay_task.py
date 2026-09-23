@@ -586,6 +586,8 @@ class DecayTask:
         # Update user data
         user_data.memorial.append(memorial)
         user_data.current_pet = None
+        from ..commands.helper_functions import reset_daily_tracking
+        reset_daily_tracking(user_data)
         user_data.pets_lost_to_neglect += 1
         user_data.total_pets_passed += 1
         

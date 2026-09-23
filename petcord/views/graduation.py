@@ -213,6 +213,8 @@ class SendToHomeButton(Button):
         # Move pet to home
         user_data.home_pets.append(pet)
         user_data.current_pet = None
+        from ..commands.helper_functions import reset_daily_tracking
+        reset_daily_tracking(user_data)
         user_data.total_pets_graduated += 1
         
         # Award legendarycoin every 5 graduations

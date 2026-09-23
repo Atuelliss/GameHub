@@ -571,10 +571,12 @@ class VitaminPurchaseConfirmView(View):
             icon_url=interaction.user.display_avatar.url
         )
 
-        try:
-            await self.parent_view.message.edit(embed=embed, view=self.parent_view)
-        except Exception:
-            pass
+        # Skip if the user has already moved on from the parent view
+        if not self.parent_view.is_finished():
+            try:
+                await self.parent_view.message.edit(embed=embed, view=self.parent_view)
+            except Exception:
+                pass
 
         self.stop()
 
@@ -899,10 +901,12 @@ class UseVitaminConfirmView(View):
             icon_url=interaction.user.display_avatar.url
         )
 
-        try:
-            await self.parent_view.message.edit(embed=embed, view=self.parent_view)
-        except Exception:
-            pass
+        # Skip if the user has already moved on from the parent view
+        if not self.parent_view.is_finished():
+            try:
+                await self.parent_view.message.edit(embed=embed, view=self.parent_view)
+            except Exception:
+                pass
 
         self.stop()
 

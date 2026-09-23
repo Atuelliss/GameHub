@@ -90,6 +90,11 @@ class PetNamingModal(Modal):
         # Save to user
         self.user_data.current_pet = new_pet
         self.user_data.total_pets_owned += 1
+
+        # Start daily tracking fresh for the new pet
+        from ..commands.helper_functions import reset_daily_tracking, initialize_daily_tracking
+        reset_daily_tracking(self.user_data)
+        initialize_daily_tracking(self.user_data)
         self.cog.schedule_save()
         
         # Stop the parent view now that adoption is successful

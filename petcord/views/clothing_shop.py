@@ -756,7 +756,11 @@ class ContinueShoppingButton(Button):
             icon_url=interaction.user.display_avatar.url
         )
         
-        await interaction.response.edit_message(embed=embed, view=clothing_view)
+        # The "already own everything" branch has already responded with a message
+        if interaction.response.is_done():
+            await interaction.message.edit(embed=embed, view=clothing_view)
+        else:
+            await interaction.response.edit_message(embed=embed, view=clothing_view)
         clothing_view.message = view.message
 
 
@@ -1326,7 +1330,11 @@ class ContinueLegendaryShoppingButton(Button):
             icon_url=interaction.user.display_avatar.url
         )
         
-        await interaction.response.edit_message(embed=embed, view=clothing_view)
+        # The "already own everything" branch has already responded with a message
+        if interaction.response.is_done():
+            await interaction.message.edit(embed=embed, view=clothing_view)
+        else:
+            await interaction.response.edit_message(embed=embed, view=clothing_view)
         clothing_view.message = view.message
 
 
@@ -1938,7 +1946,11 @@ class ContinueHolidayShoppingButton(Button):
             icon_url=interaction.user.display_avatar.url
         )
         
-        await interaction.response.edit_message(embed=embed, view=clothing_view)
+        # The "already own everything" branch has already responded with a message
+        if interaction.response.is_done():
+            await interaction.message.edit(embed=embed, view=clothing_view)
+        else:
+            await interaction.response.edit_message(embed=embed, view=clothing_view)
         clothing_view.message = view.message
 
 

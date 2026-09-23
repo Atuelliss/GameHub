@@ -17,6 +17,7 @@ from redbot.core.utils.views import SimpleMenu
 from typing import TYPE_CHECKING, Optional
 
 from ..abc import MixinMeta
+from .helper_functions import reset_daily_tracking
 from ..views.setup_wizard import PetcordSetupView
 
 if TYPE_CHECKING:
@@ -958,6 +959,7 @@ class AdminCommands(MixinMeta):
         
         # Simply remove the pet without any negative consequences
         user_data.current_pet = None
+        reset_daily_tracking(user_data)
         self.schedule_save()
         
         await ctx.send(
@@ -1486,6 +1488,7 @@ class AdminCommands(MixinMeta):
         # Move to home
         user_data.home_pets.append(pet)
         user_data.current_pet = None
+        reset_daily_tracking(user_data)
         user_data.total_pets_graduated += 1
         
         # Award legendarycoin every 5 graduations
