@@ -416,24 +416,28 @@ class AdminCommands(MixinMeta):
     
     @pcset.command(name="cleartimer", aliases=["clearcd", "resetcooldown"])
     async def pcset_cleartimer(self, ctx: Context, user: discord.Member) -> None:
-        """Clear the pet finding cooldown for a user.
+        """Clear the pet finding and Petcoin conversion cooldowns for a user.
         
-        This removes the cooldown that occurs when a user passes on a pet.
+        This removes the cooldown that occurs when a user passes on a pet,
+        and the wait between Petcoin conversions.
         
         **Arguments:**
-        - `<user>` - The user to clear the cooldown for.
+        - `<user>` - The user to clear the cooldowns for.
         """
         conf = self.db.get_conf(ctx.guild)
         user_data = conf.get_user(user)
         
-        if user_data.last_pet_declined <= 0:
+        if user_data.last_pet_declined <= 0 and user_data.last_petcoin_conversion <= 0:
             await ctx.send(f"⏱️ **{user.display_name}** doesn't have an active cooldown.")
             return
         
         user_data.last_pet_declined = 0
+        user_data.last_petcoin_conversion = 0
         self.schedule_save()
         
-        await ctx.send(f"✅ Cleared the pet finding cooldown for **{user.display_name}**.")
+        await ctx.send(
+            f"✅ Cleared the pet finding and Petcoin conversion cooldowns for **{user.display_name}**."
+        )
     
     @pcset.command(name="clearalltimers")
     async def pcset_clearalltimers(self, ctx: Context) -> None:
@@ -441,6 +445,7 @@ class AdminCommands(MixinMeta):
         
         This resets:
         - Pet finding cooldowns (from declining pets)
+        - Petcoin conversion cooldowns
         - All care action cooldowns (feed, play, groom, rest, treat, pet)
         
         This does NOT affect:
@@ -465,6 +470,7 @@ class AdminCommands(MixinMeta):
                 "This will reset **ALL** cooldowns for **ALL** users:\n\n"
                 "**Will be cleared:**\n"
                 "• Pet finding cooldowns\n"
+                "• Petcoin conversion cooldowns\n"
                 "• Feed, Play, Groom, Rest, Treat, Pet cooldowns\n\n"
                 "**Will NOT be affected:**\n"
                 "• Pet age/growth progress\n"
@@ -499,6 +505,8 @@ class AdminCommands(MixinMeta):
         for user_id, user_data in conf.users.items():
             # Clear pet finding cooldown
             user_data.last_pet_declined = 0
+            # Clear Petcoin conversion cooldown
+            user_data.last_petcoin_conversion = 0
             users_cleared += 1
             
             # Clear current pet's action cooldowns
@@ -1671,7 +1679,7 @@ class AdminCommands(MixinMeta):
             f"🥉 Bronze: **{bronze}%**"
         )
 
-    @pcset.group(name="convert", aliases=["conversion"])
+    @pcset.group(name="convert", aliases=["conversion"], invoke_without_command=True)
     async def pcset_convert(self, ctx: Context) -> None:
         """Manage Petcoin to server currency conversion.
 
@@ -1813,7 +1821,7 @@ class AdminCommands(MixinMeta):
         else:
             await ctx.send(f"✅ Players must wait **{hours}** hour(s) between conversions.")
 
-    @pcset.group(name="blacklist", aliases=["blocklist"])
+    @pcset.group(name="blacklist", aliases=["blocklist"], invoke_without_command=True)
     async def pcset_blacklist(self, ctx: Context) -> None:
         """Manage the pet name blacklist.
         
@@ -1910,7 +1918,7 @@ class AdminCommands(MixinMeta):
     # Backup & Restore Commands
     # =========================================================================
     
-    @pcset.group(name="backup")
+    @pcset.group(name="backup", invoke_without_command=True)
     @commands.is_owner()
     async def pcset_backup(self, ctx: Context) -> None:
         """Database backup management (Bot Owner only)."""
@@ -2995,8 +3003,13 @@ class CurrentStageView(View):
         if interaction.user.id == self.ctx.author.id:
             return True
         
-        # Also allow other admins
-        if await self.ctx.bot.is_admin(interaction.user):
+        # Also allow other admins (bot owner, Red admin, or Manage Server)
+        user = interaction.user
+        if await self.ctx.bot.is_owner(user):
+            return True
+        if isinstance(user, discord.Member) and user.guild_permissions.manage_guild:
+            return True
+        if await self.ctx.bot.is_admin(user):
             return True
         
         await interaction.response.send_message(
@@ -3152,8 +3165,13 @@ class ListPlayersView(View):
         if interaction.user.id == self.ctx.author.id:
             return True
         
-        # Also allow other admins
-        if await self.ctx.bot.is_admin(interaction.user):
+        # Also allow other admins (bot owner, Red admin, or Manage Server)
+        user = interaction.user
+        if await self.ctx.bot.is_owner(user):
+            return True
+        if isinstance(user, discord.Member) and user.guild_permissions.manage_guild:
+            return True
+        if await self.ctx.bot.is_admin(user):
             return True
         
         await interaction.response.send_message(
