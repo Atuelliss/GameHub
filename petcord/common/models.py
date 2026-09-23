@@ -231,7 +231,7 @@ class User(Base):
     total_pets_passed: int = 0  # Sum of above two (for quick reference)
     
     # Medal Tracking
-    most_petcoin_earned: int = 0  # Most petcoin earned    
+    most_petcoin_earned: int = 0  # Lifetime petcoin earned from non-medal sources (freebies, admin grants)
     gold_medals: int = 0
     silver_medals: int = 0
     bronze_medals: int = 0
@@ -325,7 +325,7 @@ class GuildSettings(Base):
     # Admin Settings
     admin_role_id: Optional[int] = None
     disallowed_names: List[str] = Field(default_factory=lambda: list(DEFAULT_DISALLOWED_NAMES))
-    petcoin_conversion_enabled: bool = False  # Whether petcoin can be converted to legendarycoin (future feature)
+    petcoin_conversion_enabled: bool = False  # Whether petcoin can be converted to the server's Discord currency (future feature)
     petcoin_conversion_rate: int = 10  # How many petcoin per discord currency (if enabled)
 
     # Channel Settings

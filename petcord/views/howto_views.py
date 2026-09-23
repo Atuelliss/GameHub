@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from ..common.models import User, GuildSettings
 
 from ..common.constants import (
-    GOLD_THRESHOLD, SILVER_THRESHOLD, BRONZE_THRESHOLD,
     STAGE_THRESHOLDS,
     COOLDOWN_FEED, COOLDOWN_PLAY, COOLDOWN_GROOM,
     COOLDOWN_REST, COOLDOWN_TREAT, COOLDOWN_PET,
@@ -520,9 +519,9 @@ class HowToView(View):
         embed.add_field(
             name="Medal Thresholds",
             value=(
-                f"🥇 **Gold Medal** - {GOLD_THRESHOLD}%+ average\n"
-                f"🥈 **Silver Medal** - {SILVER_THRESHOLD}%+ average\n"
-                f"🥉 **Bronze Medal** - {BRONZE_THRESHOLD}%+ average\n"
+                f"🥇 **Gold Medal** - {self.guild_settings.medal_gold_threshold}%+ average\n"
+                f"🥈 **Silver Medal** - {self.guild_settings.medal_silver_threshold}%+ average\n"
+                f"🥉 **Bronze Medal** - {self.guild_settings.medal_bronze_threshold}%+ average\n"
                 "❌ **No Medal** - Below bronze threshold"
             ),
             inline=True

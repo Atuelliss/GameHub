@@ -1437,7 +1437,6 @@ class AdminCommands(MixinMeta):
         Useful for testing or helping users who encounter issues.
         """
         import time
-        from ..common.constants import GOLD_THRESHOLD, SILVER_THRESHOLD, BRONZE_THRESHOLD
         
         conf = self.db.get_conf(ctx.guild)
         user_data = conf.get_user(user)
@@ -1456,17 +1455,17 @@ class AdminCommands(MixinMeta):
             avg_score = (pet.hunger + pet.happiness + pet.cleanliness + pet.energy) / 4
         
         # Determine medal
-        if avg_score >= GOLD_THRESHOLD:
+        if avg_score >= conf.medal_gold_threshold:
             pet.medal = "gold"
             bond_bonus = 20
             user_data.gold_medals += 1
             medal_display = "🥇 Gold"
-        elif avg_score >= SILVER_THRESHOLD:
+        elif avg_score >= conf.medal_silver_threshold:
             pet.medal = "silver"
             bond_bonus = 10
             user_data.silver_medals += 1
             medal_display = "🥈 Silver"
-        elif avg_score >= BRONZE_THRESHOLD:
+        elif avg_score >= conf.medal_bronze_threshold:
             pet.medal = "bronze"
             bond_bonus = 5
             user_data.bronze_medals += 1

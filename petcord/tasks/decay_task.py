@@ -664,10 +664,12 @@ class DecayTask:
             # Add to history
             if user_data.current_day_scores:
                 user_data.care_history.append(user_data.current_day_scores)
-                pet.growth_daily_scores.append(user_data.current_day_scores)
-            
+                # Medal scoring stops once the pet reaches adulthood
+                if not pet.reached_adult_timestamp:
+                    pet.growth_daily_scores.append(user_data.current_day_scores)
+
             # Update running average
-            if pet.growth_daily_scores:
+            if pet.growth_daily_scores and not pet.reached_adult_timestamp:
                 all_scores = [s.final_score for s in pet.growth_daily_scores]
                 pet.growth_average_score = sum(all_scores) / len(all_scores)
                 pet.growth_total_days = len(all_scores)

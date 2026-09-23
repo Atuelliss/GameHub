@@ -12,8 +12,10 @@ if TYPE_CHECKING:
 def award_graduation_petcoins(user_data: "User", pet: "Pet", medal: str) -> int:
     """
     Calculate and award petcoins for graduation based on medal and days raised.
-    
-    Formula: (days × 2) + base_medal_value
+
+    Formula: ((growth days × 2) + base_medal_value) × lifespan multiplier
+    Growth days are capped at the species' adult age, so delaying graduation
+    does not increase the reward.
     
     Args:
         user_data: The user data to update
@@ -23,29 +25,37 @@ def award_graduation_petcoins(user_data: "User", pet: "Pet", medal: str) -> int:
     Returns:
         The amount of petcoins awarded
     """
-    from ..common.constants import MEDAL_PETCOIN_VALUES
-    
+    from ..common.constants import (
+        MEDAL_PETCOIN_VALUES,
+        LIFESPAN_PETCOIN_MULTIPLIERS,
+        STAGE_THRESHOLDS,
+    )
+    from ..database.species import get_species
+
     # No medal = no petcoins
     if not medal:
         return 0
-    
+
     # Get base value from medal
     base_value = MEDAL_PETCOIN_VALUES.get(medal, 0)
     if base_value == 0:
         return 0
-    
-    # Calculate final amount: (days × 2) + base_medal_value
-    days_bonus = int(pet.age_days) * 2
-    petcoins_earned = days_bonus + base_value
-    
+
+    # Species lifespan drives both the growth-day cap and the multiplier
+    species = get_species(pet.species_id)
+    lifespan = species.lifespan if species else "medium"
+    adult_age = STAGE_THRESHOLDS.get(lifespan, STAGE_THRESHOLDS["medium"])["adult"]
+    multiplier = LIFESPAN_PETCOIN_MULTIPLIERS.get(lifespan, 1.0)
+
+    # Calculate final amount: ((growth days × 2) + base_medal_value) × multiplier
+    growth_days = min(int(pet.age_days), adult_age)
+    days_bonus = growth_days * 2
+    petcoins_earned = int((days_bonus + base_value) * multiplier)
+
     # Update user's petcoin balances
     user_data.current_petcoin += petcoins_earned
     user_data.petcoin_earned_from_medals += petcoins_earned
-    
-    # Update most_petcoin_earned if this is a new high single-award
-    if petcoins_earned > user_data.most_petcoin_earned:
-        user_data.most_petcoin_earned = petcoins_earned
-    
+
     return petcoins_earned
 
 

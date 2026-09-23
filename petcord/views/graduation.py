@@ -11,7 +11,6 @@ if TYPE_CHECKING:
     from ..main import Petcord
     from ..common.models import User, GuildSettings
 
-from ..common.constants import GOLD_THRESHOLD, SILVER_THRESHOLD, BRONZE_THRESHOLD
 
 
 class GraduationView(View):
@@ -45,11 +44,11 @@ class GraduationView(View):
         pet = self.user_data.current_pet
         avg_score = pet.growth_average_score
         
-        if avg_score >= GOLD_THRESHOLD:
+        if avg_score >= self.guild_settings.medal_gold_threshold:
             return ("🥇 GOLD", "gold", "🥇")
-        elif avg_score >= SILVER_THRESHOLD:
+        elif avg_score >= self.guild_settings.medal_silver_threshold:
             return ("🥈 SILVER", "silver", "🥈")
-        elif avg_score >= BRONZE_THRESHOLD:
+        elif avg_score >= self.guild_settings.medal_bronze_threshold:
             return ("🥉 BRONZE", "bronze", "🥉")
         else:
             return ("No Medal", "", "❌")
@@ -108,9 +107,9 @@ class GraduationView(View):
         embed.add_field(
             name="🎯 Medal Thresholds",
             value=(
-                f"🥇 Gold: {GOLD_THRESHOLD}%+\n"
-                f"🥈 Silver: {SILVER_THRESHOLD}%+\n"
-                f"🥉 Bronze: {BRONZE_THRESHOLD}%+"
+                f"🥇 Gold: {self.guild_settings.medal_gold_threshold}%+\n"
+                f"🥈 Silver: {self.guild_settings.medal_silver_threshold}%+\n"
+                f"🥉 Bronze: {self.guild_settings.medal_bronze_threshold}%+"
             ),
             inline=True
         )
@@ -187,15 +186,15 @@ class SendToHomeButton(Button):
         
         # Calculate and set medal
         avg_score = pet.growth_average_score
-        if avg_score >= GOLD_THRESHOLD:
+        if avg_score >= view.guild_settings.medal_gold_threshold:
             pet.medal = "gold"
             bond_bonus = 20
             user_data.gold_medals += 1
-        elif avg_score >= SILVER_THRESHOLD:
+        elif avg_score >= view.guild_settings.medal_silver_threshold:
             pet.medal = "silver"
             bond_bonus = 10
             user_data.silver_medals += 1
-        elif avg_score >= BRONZE_THRESHOLD:
+        elif avg_score >= view.guild_settings.medal_bronze_threshold:
             pet.medal = "bronze"
             bond_bonus = 5
             user_data.bronze_medals += 1
@@ -320,7 +319,7 @@ class KeepGrowingButton(Button):
             description=(
                 f"**{pet.name}** will continue growing with you!\n\n"
                 f"They can still graduate to Home anytime from the main menu.\n"
-                f"Note: Your daily care score will keep updating."
+                f"Note: Their medal score is final and will not change."
             ),
             color=discord.Color.blue()
         )
