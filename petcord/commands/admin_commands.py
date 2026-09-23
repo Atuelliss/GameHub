@@ -342,11 +342,13 @@ class AdminCommands(MixinMeta):
     async def petsetup(self, ctx: Context) -> None:
         """Interactive setup wizard for Petcord.
 
-        Walks you through the four core settings:
+        Walks you through the six core settings:
         1. Notification channel
         2. Default home capacity
         3. Pet death toggle
-        4. Enable the game
+        4. Petcoin conversion toggle (Petcoin to server currency)
+        5. Petcoin conversion rate & limits (skipped if conversion is disabled)
+        6. Enable the game
 
         Each step saves immediately. You can re-run this command at any time
         to review or change settings. Use `pcset` commands for finer control.
@@ -1065,11 +1067,9 @@ class AdminCommands(MixinMeta):
         
         # Petcoin conversion
         currency_name = await bank.get_currency_name(ctx.guild)
-        conversion_status = "💱 Enabled" if conf.petcoin_conversion_enabled else "❌ Disabled"
-        embed.add_field(name="Petcoin Conversion", value=conversion_status, inline=True)
         embed.add_field(
-            name="Conversion Rate",
-            value=f"{conf.petcoin_conversion_rate} Petcoin → 1 {currency_name}",
+            name="Petcoin Conversion",
+            value=self._format_conversion_settings(conf, currency_name),
             inline=True,
         )
 
@@ -1670,6 +1670,148 @@ class AdminCommands(MixinMeta):
             f"🥈 Silver: **{silver}%**\n"
             f"🥉 Bronze: **{bronze}%**"
         )
+
+    @pcset.group(name="convert", aliases=["conversion"])
+    async def pcset_convert(self, ctx: Context) -> None:
+        """Manage Petcoin to server currency conversion.
+
+        Players convert Petcoin from the 💱 Convert button on their Stats page.
+        """
+        if ctx.invoked_subcommand is None:
+            prefix = ctx.clean_prefix
+            conf = self.db.get_conf(ctx.guild)
+            currency_name = await bank.get_currency_name(ctx.guild)
+            embed = discord.Embed(
+                title="💱 Petcoin Conversion",
+                description=f"Use `{prefix}pcset convert <command>` to change a setting.",
+                color=discord.Color.gold(),
+            )
+            embed.add_field(
+                name="Current Settings",
+                value=self._format_conversion_settings(conf, currency_name),
+                inline=False,
+            )
+            cmds = sorted(ctx.command.commands, key=lambda c: c.name)
+            for cmd in cmds:
+                brief = cmd.brief or (cmd.help.splitlines()[0] if cmd.help else "No description.")
+                aliases = f" | aliases: {', '.join(cmd.aliases)}" if cmd.aliases else ""
+                embed.add_field(
+                    name=f"`{prefix}pcset convert {cmd.name}`{aliases}",
+                    value=brief,
+                    inline=False,
+                )
+            await ctx.send(embed=embed)
+
+    def _format_conversion_settings(self, conf, currency_name: str) -> str:
+        """Build the conversion settings summary used by convert and display."""
+        status = "💱 Enabled" if conf.petcoin_conversion_enabled else "❌ Disabled"
+        minimum = f"{conf.petcoin_conversion_minimum:,} Petcoin" if conf.petcoin_conversion_minimum > 0 else "None"
+        cap = f"{conf.petcoin_conversion_daily_cap:,} {currency_name}" if conf.petcoin_conversion_daily_cap > 0 else "None"
+        cooldown = f"{conf.petcoin_conversion_cooldown_hours} hours" if conf.petcoin_conversion_cooldown_hours > 0 else "None"
+        return (
+            f"Status: **{status}**\n"
+            f"Rate: **{conf.petcoin_conversion_rate:,}** Petcoin → **{conf.petcoin_conversion_currency:,}** {currency_name}\n"
+            f"Minimum: **{minimum}**\n"
+            f"Daily Cap: **{cap}** per user\n"
+            f"Cooldown: **{cooldown}**"
+        )
+
+    @pcset_convert.command(name="toggle")
+    async def convert_toggle(self, ctx: Context) -> None:
+        """Enable or disable Petcoin conversion."""
+        conf = self.db.get_conf(ctx.guild)
+        conf.petcoin_conversion_enabled = not conf.petcoin_conversion_enabled
+        self.schedule_save()
+
+        if not conf.petcoin_conversion_enabled:
+            await ctx.send("❌ Petcoin conversion is now **disabled**. Players keep their Petcoin.")
+            return
+
+        currency_name = await bank.get_currency_name(ctx.guild)
+        msg = (
+            f"💱 Petcoin conversion is now **enabled**.\n"
+            f"Rate: **{conf.petcoin_conversion_rate:,}** Petcoin → **{conf.petcoin_conversion_currency:,}** {currency_name}"
+        )
+        if await bank.is_global():
+            msg += (
+                "\n\n⚠️ This bot uses a **global bank**, so converted currency goes into a balance "
+                "shared across every server. Other servers may set different rates."
+            )
+        await ctx.send(msg)
+
+    @pcset_convert.command(name="rate")
+    async def convert_rate(self, ctx: Context, petcoin: int, currency: int) -> None:
+        """Set the conversion rate: X Petcoin → Y server currency.
+
+        **Arguments:**
+        - `<petcoin>` - Petcoin exchanged per batch (e.g., 10)
+        - `<currency>` - Server currency received per batch (e.g., 1)
+
+        Conversions happen in whole batches; leftover Petcoin stays with the player.
+        """
+        if petcoin < 1 or currency < 1:
+            await ctx.send("❌ Both values must be at least 1.")
+            return
+
+        conf = self.db.get_conf(ctx.guild)
+        conf.petcoin_conversion_rate = petcoin
+        conf.petcoin_conversion_currency = currency
+        self.schedule_save()
+
+        currency_name = await bank.get_currency_name(ctx.guild)
+        await ctx.send(f"✅ Conversion rate set to **{petcoin:,}** Petcoin → **{currency:,}** {currency_name}.")
+
+    @pcset_convert.command(name="minimum", aliases=["min"])
+    async def convert_minimum(self, ctx: Context, petcoin: int) -> None:
+        """Set the minimum Petcoin per conversion (0 = no minimum)."""
+        if petcoin < 0:
+            await ctx.send("❌ Minimum cannot be negative.")
+            return
+
+        conf = self.db.get_conf(ctx.guild)
+        conf.petcoin_conversion_minimum = petcoin
+        self.schedule_save()
+
+        if petcoin == 0:
+            await ctx.send("✅ Conversion minimum removed.")
+        else:
+            await ctx.send(f"✅ Players must convert at least **{petcoin:,}** Petcoin at a time.")
+
+    @pcset_convert.command(name="dailycap", aliases=["cap"])
+    async def convert_dailycap(self, ctx: Context, currency: int) -> None:
+        """Set the max server currency each player can receive per day (0 = no cap).
+
+        The day resets at midnight in the server timezone (`pcset timezone`).
+        """
+        if currency < 0:
+            await ctx.send("❌ Daily cap cannot be negative.")
+            return
+
+        conf = self.db.get_conf(ctx.guild)
+        conf.petcoin_conversion_daily_cap = currency
+        self.schedule_save()
+
+        if currency == 0:
+            await ctx.send("✅ Daily conversion cap removed.")
+        else:
+            currency_name = await bank.get_currency_name(ctx.guild)
+            await ctx.send(f"✅ Players can receive up to **{currency:,}** {currency_name} per day from conversions.")
+
+    @pcset_convert.command(name="cooldown", aliases=["cd"])
+    async def convert_cooldown(self, ctx: Context, hours: int) -> None:
+        """Set the hours each player must wait between conversions (0 = none)."""
+        if hours < 0:
+            await ctx.send("❌ Cooldown cannot be negative.")
+            return
+
+        conf = self.db.get_conf(ctx.guild)
+        conf.petcoin_conversion_cooldown_hours = hours
+        self.schedule_save()
+
+        if hours == 0:
+            await ctx.send("✅ Conversion cooldown removed.")
+        else:
+            await ctx.send(f"✅ Players must wait **{hours}** hour(s) between conversions.")
 
     @pcset.group(name="blacklist", aliases=["blocklist"])
     async def pcset_blacklist(self, ctx: Context) -> None:

@@ -243,6 +243,13 @@ class User(Base):
     legendarycoin: int = 0  # Legendary currency (for future use)
     most_legendarycoin_earned: int = 0  # Most legendarycoin earned
 
+    # Petcoin -> server currency conversion tracking
+    total_petcoin_converted: int = 0  # Lifetime petcoin spent on conversions
+    total_currency_from_petcoin: int = 0  # Lifetime server currency received
+    last_petcoin_conversion: float = 0.0  # Timestamp of last conversion (for cooldown)
+    currency_converted_today: int = 0  # Server currency received on conversion_day (for daily cap)
+    conversion_day: str = ""  # "YYYY-MM-DD" in server timezone that currency_converted_today applies to
+
     # Daily Care Stats (for current growing pet)
     current_day_start: float = 0.0  # Timestamp when current day started
     current_day_scores: Optional[DailyCareScore] = None  # Today's tracking
@@ -326,7 +333,11 @@ class GuildSettings(Base):
     admin_role_id: Optional[int] = None
     disallowed_names: List[str] = Field(default_factory=lambda: list(DEFAULT_DISALLOWED_NAMES))
     petcoin_conversion_enabled: bool = False  # Whether petcoin can be converted to the server's Discord currency (future feature)
-    petcoin_conversion_rate: int = 10  # How many petcoin per discord currency (if enabled)
+    petcoin_conversion_rate: int = 1  # Petcoin exchanged per conversion batch (X in "X petcoin -> Y currency")
+    petcoin_conversion_currency: int = 5  # Server currency received per batch (Y in "X petcoin -> Y currency")
+    petcoin_conversion_minimum: int = 0  # Minimum petcoin per conversion (0 = one batch)
+    petcoin_conversion_daily_cap: int = 0  # Max server currency a user can receive per day (0 = no cap)
+    petcoin_conversion_cooldown_hours: int = 0  # Hours between conversions per user (0 = no cooldown)
 
     # Channel Settings
     allowed_channel_id: Optional[int] = None  # Channel for notifications (deaths, etc.)

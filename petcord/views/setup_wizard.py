@@ -6,7 +6,7 @@ A linear, 6-step wizard that walks an admin through initial configuration:
     Step 2 — Default home capacity
     Step 3 — Pet death toggle
     Step 4 — Petcoin conversion toggle
-    Step 5 — Petcoin conversion rate
+    Step 5 — Petcoin conversion rate & limits (skipped if conversion is disabled)
     Step 6 — Enable the game
 """
 
@@ -31,7 +31,7 @@ STEP_TITLES: Dict[int, str] = {
     2: "Default Home Capacity",
     3: "Pet Death",
     4: "Petcoin Conversion",
-    5: "Conversion Rate",
+    5: "Conversion Rate & Limits",
     6: "Enable Game",
 }
 
@@ -57,10 +57,14 @@ STEP_DESCRIPTIONS: Dict[int, str] = {
         "using the conversion rate set in the next step."
     ),
     5: (
-        "Set the **conversion rate**: how many Petcoin are required to receive "
-        "1 Discord economy credit.\n\n"
-        "Example: a rate of 10 means 10 Petcoin → 1 credit.\n"
-        "Click **Set Rate** to enter a value."
+        "Set the **conversion rate and limits**.\n\n"
+        "• **Rate:** X Petcoin → Y server currency (e.g. 1 Petcoin → 5 credits)\n"
+        "• **Minimum:** smallest Petcoin amount per conversion\n"
+        "• **Daily cap:** most currency a player can receive per day\n"
+        "• **Cooldown:** hours a player must wait between conversions\n\n"
+        "Use 0 for no minimum, cap, or cooldown. Click **Set Rate & Limits** to "
+        "enter values, or **Keep Current** to continue. You can change these "
+        "later with `pcset convert`."
     ),
     6: (
         "Everything is configured! **Enable the game** to let players start "
@@ -74,38 +78,97 @@ STEP_DESCRIPTIONS: Dict[int, str] = {
 # Modal
 # ---------------------------------------------------------------------------
 
-class _ConversionRateModal(discord.ui.Modal, title="Set Conversion Rate"):
+def _conversion_settings_display(conf: "GuildSettings") -> str:
+    """Summary of the conversion rate and limits for the wizard embeds."""
+    minimum = conf.petcoin_conversion_minimum
+    cap = conf.petcoin_conversion_daily_cap
+    cooldown = conf.petcoin_conversion_cooldown_hours
+    return (
+        f"{conf.petcoin_conversion_rate} Petcoin → {conf.petcoin_conversion_currency} credit(s)\n"
+        f"Minimum: {f'{minimum} Petcoin' if minimum else 'None'} • "
+        f"Daily cap: {f'{cap} credit(s)' if cap else 'None'} • "
+        f"Cooldown: {f'{cooldown}h' if cooldown else 'None'}"
+    )
+
+
+class _ConversionRateModal(discord.ui.Modal, title="Conversion Rate & Limits"):
     rate: discord.ui.TextInput = discord.ui.TextInput(
-        label="Petcoin per Discord Credit",
-        placeholder="Enter a whole number (e.g. 10)",
+        label="Petcoin per conversion batch",
+        placeholder="Whole number, at least 1 (e.g. 1)",
         min_length=1,
         max_length=6,
         required=True,
     )
+    currency: discord.ui.TextInput = discord.ui.TextInput(
+        label="Server currency received per batch",
+        placeholder="Whole number, at least 1 (e.g. 5)",
+        min_length=1,
+        max_length=6,
+        required=True,
+    )
+    minimum: discord.ui.TextInput = discord.ui.TextInput(
+        label="Minimum Petcoin per conversion (0 = none)",
+        placeholder="0",
+        max_length=9,
+        required=False,
+    )
+    daily_cap: discord.ui.TextInput = discord.ui.TextInput(
+        label="Daily currency cap per player (0 = none)",
+        placeholder="0",
+        max_length=9,
+        required=False,
+    )
+    cooldown: discord.ui.TextInput = discord.ui.TextInput(
+        label="Hours between conversions (0 = none)",
+        placeholder="0",
+        max_length=4,
+        required=False,
+    )
 
-    def __init__(self, wizard: "PetcordSetupView", current_value: int) -> None:
+    def __init__(self, wizard: "PetcordSetupView", conf: "GuildSettings") -> None:
         super().__init__()
         self.wizard = wizard
-        self.rate.default = str(current_value)
+        self.rate.default = str(conf.petcoin_conversion_rate)
+        self.currency.default = str(conf.petcoin_conversion_currency)
+        self.minimum.default = str(conf.petcoin_conversion_minimum)
+        self.daily_cap.default = str(conf.petcoin_conversion_daily_cap)
+        self.cooldown.default = str(conf.petcoin_conversion_cooldown_hours)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        try:
-            value = int(self.rate.value.strip())
-        except ValueError:
-            await interaction.response.send_message(
-                "❌ Please enter a valid whole number.", ephemeral=True
-            )
-            return
+        fields = [
+            (self.rate, "Petcoin per batch", 1),
+            (self.currency, "Currency per batch", 1),
+            (self.minimum, "Minimum", 0),
+            (self.daily_cap, "Daily cap", 0),
+            (self.cooldown, "Cooldown", 0),
+        ]
+        values = []
+        for text_input, name, lowest in fields:
+            raw = text_input.value.strip().replace(",", "") or "0"
+            try:
+                value = int(raw)
+            except ValueError:
+                await interaction.response.send_message(
+                    f"❌ **{name}** must be a whole number.", ephemeral=True
+                )
+                return
+            if value < lowest:
+                await interaction.response.send_message(
+                    f"❌ **{name}** must be at least {lowest}.", ephemeral=True
+                )
+                return
+            values.append(value)
 
-        if value < 1:
-            await interaction.response.send_message(
-                "❌ Conversion rate must be at least 1.", ephemeral=True
-            )
-            return
-
-        self.wizard.conf.petcoin_conversion_rate = value
+        conf = self.wizard.conf
+        (
+            conf.petcoin_conversion_rate,
+            conf.petcoin_conversion_currency,
+            conf.petcoin_conversion_minimum,
+            conf.petcoin_conversion_daily_cap,
+            conf.petcoin_conversion_cooldown_hours,
+        ) = values
         self.wizard.cog.schedule_save()
-        self.wizard.completed[5] = f"{value} Petcoin → 1 credit"
+        self.wizard.completed[5] = _conversion_settings_display(conf)
         await self.wizard._advance(interaction, from_modal=True)
 
 
@@ -217,7 +280,9 @@ class PetcordSetupView(View):
         if step == 4:
             return "Enabled 💱" if self.conf.petcoin_conversion_enabled else "Disabled ❌"
         if step == 5:
-            return f"{self.conf.petcoin_conversion_rate} Petcoin → 1 credit"
+            if not self.conf.petcoin_conversion_enabled:
+                return "Skipped (conversion disabled)"
+            return _conversion_settings_display(self.conf)
         if step == 6:
             return "Enabled ✅" if self.conf.game_is_enabled else "Disabled ❌"
         return "—"
@@ -359,24 +424,36 @@ class PetcordSetupView(View):
 
     def _add_conversion_rate_button(self) -> None:
         btn = Button(
-            label="Set Rate",
+            label="Set Rate & Limits",
             style=discord.ButtonStyle.primary,
             emoji="💱",
             row=0,
         )
 
         async def cb(interaction: discord.Interaction) -> None:
-            modal = _ConversionRateModal(self, self.conf.petcoin_conversion_rate)
+            modal = _ConversionRateModal(self, self.conf)
             await interaction.response.send_modal(modal)
 
         btn.callback = cb
         self.add_item(btn)
+
+        keep_btn = Button(label="Keep Current", style=discord.ButtonStyle.secondary, row=0)
+
+        async def keep_cb(interaction: discord.Interaction) -> None:
+            self.completed[5] = _conversion_settings_display(self.conf)
+            await self._advance(interaction)
+
+        keep_btn.callback = keep_cb
+        self.add_item(keep_btn)
 
     def _add_back_button(self) -> None:
         btn = Button(label="◀ Back", style=discord.ButtonStyle.secondary, row=1)
 
         async def cb(interaction: discord.Interaction) -> None:
             self.current_step -= 1
+            # Step 5 only applies when conversion is enabled
+            if self.current_step == 5 and not self.conf.petcoin_conversion_enabled:
+                self.current_step -= 1
             self._build_current_step()
             await interaction.response.edit_message(embed=self._build_embed(), view=self)
 
@@ -394,6 +471,10 @@ class PetcordSetupView(View):
     ) -> None:
         if self.current_step < TOTAL_STEPS:
             self.current_step += 1
+            # Skip the rate & limits step when conversion was just disabled
+            if self.current_step == 5 and not self.conf.petcoin_conversion_enabled:
+                self.completed[5] = "Skipped (conversion disabled)"
+                self.current_step += 1
             self._build_current_step()
             embed = self._build_embed()
             if from_modal:

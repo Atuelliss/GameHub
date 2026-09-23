@@ -47,7 +47,9 @@ class StatsView(View):
         # Row 1: How-To and Notifications
         self.add_item(HowToButton(row=1))
         self.add_item(NotificationsButton(self.user_data, row=1))
-        
+        if self.guild_settings.petcoin_conversion_enabled:
+            self.add_item(ConvertPetcoinButton(row=1))
+
         # Row 2: Navigation
         self.add_item(BackToMenuButton(row=2))
         self.add_item(StatsCloseButton(row=2))
@@ -77,10 +79,15 @@ class StatsView(View):
         
         # Petcoin section
         lifetime_petcoin = user.most_petcoin_earned + user.petcoin_earned_from_medals
+        petcoin_text = (
+            f"Balance: **{user.current_petcoin:,}**\n"
+            f"Lifetime Earned: **{lifetime_petcoin:,}**"
+        )
+        if user.total_petcoin_converted > 0:
+            petcoin_text += f"\nConverted: **{user.total_petcoin_converted:,}**"
         embed.add_field(
             name="💰 Petcoins",
-            value=f"Balance: **{user.current_petcoin:,}**\n"
-                  f"Lifetime Earned: **{lifetime_petcoin:,}**",
+            value=petcoin_text,
             inline=True
         )
         
@@ -362,6 +369,47 @@ class StatsCloseButton(Button):
             for item in view.children:
                 item.disabled = True
             await interaction.response.edit_message(view=view)
+
+
+class ConvertPetcoinButton(Button):
+    """Button to convert Petcoin into the server's currency (shown only when enabled)."""
+    def __init__(self, row: int = 1):
+        super().__init__(
+            label="Convert",
+            emoji="💱",
+            style=discord.ButtonStyle.primary,
+            row=row
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        from redbot.core import bank
+        from .petcoin_convert import PetcoinConvertView
+
+        view: StatsView = self.view
+
+        # Setting may have been turned off since this menu was opened
+        if not view.guild_settings.petcoin_conversion_enabled:
+            await interaction.response.send_message(
+                "❌ Petcoin conversion is currently disabled on this server.",
+                ephemeral=True
+            )
+            return
+
+        currency_name = await bank.get_currency_name(interaction.guild)
+        convert_view = PetcoinConvertView(
+            cog=view.cog,
+            user_data=view.user_data,
+            guild_settings=view.guild_settings,
+            author_id=view.author_id,
+            currency_name=currency_name,
+            origin=interaction,
+            parent_view=view
+        )
+        await interaction.response.send_message(
+            embed=convert_view.build_embed(),
+            view=convert_view,
+            ephemeral=True
+        )
 
 
 class NotificationsButton(Button):
