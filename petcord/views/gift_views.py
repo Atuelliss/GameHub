@@ -177,11 +177,14 @@ class PetGiftView(View):
             self.cog._active_views.discard(self)
             return
         
-        # Verify the pet is still in the sender's home at the expected index
-        if self.pet_index >= len(self.sender_data.home_pets):
+        # Enforce the sender's gift cooldown at accept time too, so several
+        # offers sent at once can't all be accepted
+        cooldown_seconds = self.guild_settings.gift_cooldown_hours * 3600
+        if time.time() - self.sender_data.last_gift_sent_timestamp < cooldown_seconds:
             error_embed = discord.Embed(
-                title="❌ Pet No Longer Available",
-                description="This pet is no longer in the sender's Home.",
+                title="⏳ Gift Cooldown Active",
+                description=f"{self.sender.display_name} has already gifted a pet recently. "
+                            "They'll need to send a new offer once their gift cooldown ends.",
                 color=discord.Color.red()
             )
             self.stop()
@@ -190,12 +193,12 @@ class PetGiftView(View):
             await interaction.response.edit_message(embed=error_embed, view=self)
             self.cog._active_views.discard(self)
             return
-        
-        # Additional verification - check by name in case list order changed
+
+        # Verify the exact pet is still in the sender's home (list order may have changed)
         sender_pet = None
         actual_index = -1
         for i, p in enumerate(self.sender_data.home_pets):
-            if p.name == self.pet.name and p.species_id == self.pet.species_id:
+            if p is self.pet:
                 sender_pet = p
                 actual_index = i
                 break

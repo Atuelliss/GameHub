@@ -225,21 +225,31 @@ class DecayTask:
                 continue
             
             # Process each user
-            for user_id, user_data in conf.users.items():
-                # Process current growing pet
-                pet = user_data.current_pet
-                if pet and not pet.is_in_home:
-                    # Check for daily rollover first
-                    await self._check_daily_rollover(user_data, conf)
-                    
-                    # Then apply decay
-                    await self._decay_pet(guild.id, user_id, user_data, conf)
-                    pets_processed += 1
-                
-                # Process home pets (aging and natural death)
-                if user_data.home_pets:
-                    await self._process_home_pets(guild.id, user_id, user_data, conf)
-                    home_pets_processed += len(user_data.home_pets)
+            # Iterate over a snapshot so edits during awaits can't break the loop
+            for user_id, user_data in list(conf.users.items()):
+                # Isolate each player so one bad record can't stop decay for everyone
+                try:
+                    # Process current growing pet
+                    pet = user_data.current_pet
+                    if pet and not pet.is_in_home:
+                        # Check for daily rollover first
+                        await self._check_daily_rollover(user_data, conf)
+
+                        # Then apply decay
+                        await self._decay_pet(guild.id, user_id, user_data, conf)
+                        pets_processed += 1
+
+                    # Process home pets (aging and natural death)
+                    if user_data.home_pets:
+                        await self._process_home_pets(guild.id, user_id, user_data, conf)
+                        home_pets_processed += len(user_data.home_pets)
+                except asyncio.CancelledError:
+                    raise
+                except Exception as e:
+                    log.error(
+                        f"Decay error for user {user_id} in guild {guild.id}: {e}",
+                        exc_info=True
+                    )
         
         if pets_processed > 0 or home_pets_processed > 0:
             log.debug(f"Decay processed: {pets_processed} active pets, {home_pets_processed} home pets")

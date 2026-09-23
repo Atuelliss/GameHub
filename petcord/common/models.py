@@ -188,6 +188,7 @@ class User(Base):
     
     # Pending Death Notification (shown when user next opens petcord)
     warning_notifications: bool = True  # Whether user wants danger warnings (default enabled)
+    accepted_game_warning: bool = False  # True once the user accepts the first-run pet-raising warning
     last_warning_sent: float = 0.0  # Timestamp of last danger warning sent (cooldown)
     last_stat_tier_notification: float = 0.0  # Timestamp of last stat tier change notification
     pending_death_notification: bool = False
@@ -240,7 +241,7 @@ class User(Base):
     current_medal_streak: int = 0
     petcoin_earned_from_medals: int = 0  # Total petcoin earned from medals
     current_petcoin: int = 0  # Petcoin remaining
-    legendarycoin: int = 0  # Legendary currency (for future use)
+    legendarycoin: int = 0  # Legendary currency (spent on Legendary clothing items)
     most_legendarycoin_earned: int = 0  # Most legendarycoin earned
 
     # Petcoin -> server currency conversion tracking
@@ -332,7 +333,7 @@ class GuildSettings(Base):
     # Admin Settings
     admin_role_id: Optional[int] = None
     disallowed_names: List[str] = Field(default_factory=lambda: list(DEFAULT_DISALLOWED_NAMES))
-    petcoin_conversion_enabled: bool = False  # Whether petcoin can be converted to the server's Discord currency (future feature)
+    petcoin_conversion_enabled: bool = False  # Whether petcoin can be converted to the server's Discord currency
     petcoin_conversion_rate: int = 1  # Petcoin exchanged per conversion batch (X in "X petcoin -> Y currency")
     petcoin_conversion_currency: int = 5  # Server currency received per batch (Y in "X petcoin -> Y currency")
     petcoin_conversion_minimum: int = 0  # Minimum petcoin per conversion (0 = one batch)

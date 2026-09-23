@@ -368,6 +368,14 @@ class FindPetButton(Button):
         from .find_pet import PetFoundView, generate_offered_pet
         from ..common.utils import calculate_cooldown_remaining, format_cooldown
         
+        # Stale menu check - the player may have adopted from another open menu
+        if view.user_data.current_pet is not None:
+            await interaction.response.send_message(
+                "❌ You already have a pet! Use **Refresh** to update this menu.",
+                ephemeral=True
+            )
+            return
+
         # Double-check cooldown (in case button state is stale)
         cooldown_remaining = calculate_cooldown_remaining(
             view.user_data.last_pet_declined,
@@ -404,23 +412,6 @@ class FindPetButton(Button):
         
         await interaction.response.edit_message(embed=embed, view=pet_view)
         pet_view.message = view.message
-
-
-class ViewPetButton(Button):
-    """Button to view current pet details."""
-    def __init__(self):
-        super().__init__(
-            label="Details",
-            emoji="📋",
-            style=discord.ButtonStyle.secondary,
-            row=1
-        )
-    
-    async def callback(self, interaction: discord.Interaction) -> None:
-        await interaction.response.send_message(
-            "📋 Detailed pet view coming soon!",
-            ephemeral=True
-        )
 
 
 class CareActionButton(Button):
@@ -1142,7 +1133,20 @@ class AbandonConfirmView(View):
         
         pet = self.pet
         user_data = self.parent_view.user_data
-        
+
+        # The pet may have graduated/died (or been replaced) since this confirmation opened
+        if user_data.current_pet is not pet:
+            self.stop()
+            await interaction.response.edit_message(
+                embed=discord.Embed(
+                    title="❌ Can't Abandon",
+                    description=f"**{pet.name}** is no longer your current pet. Nothing was changed.",
+                    color=discord.Color.red()
+                ),
+                view=None
+            )
+            return
+
         # Record the abandonment
         user_data.pets_abandoned += 1
         

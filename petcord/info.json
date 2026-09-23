@@ -1,5 +1,5 @@
 {
-  "author": ["Jayar"],
+  "author": ["Jayar/Vainne"],
   "description": "A virtual pet game for Discord. Adopt, care for, and nurture randomized animals through their lifecycle.",
   "disabled": false,
   "end_user_data_statement": "This cog stores user pet data, interaction history, achievements, and statistics.",
@@ -9,7 +9,7 @@
   "min_python_version": [3, 10, 0],
   "permissions": ["administrator"],
   "required_cogs": {},
-  "requirements": ["pydantic"],
+  "requirements": ["pydantic", "tzdata"],
   "short": "Virtual pet game - adopt, care for, and raise pets!",
   "tags": ["game", "pets", "petcord", "virtual pet", "fun"],
   "type": "COG"

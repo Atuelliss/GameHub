@@ -4,9 +4,10 @@ Admin commands for Petcord cog.
 
 from __future__ import annotations
 
+import csv
 import json
 from datetime import datetime
-from io import BytesIO
+from io import BytesIO, StringIO
 from zoneinfo import ZoneInfo, available_timezones
 
 import discord
@@ -310,6 +311,64 @@ class ClearAllTimersConfirmView(View):
                 pass
 
 
+class UserInfoImportConfirmView(View):
+    """Confirmation view for importing user info (Overwrite All / Add New Only / Cancel)."""
+
+    def __init__(self, author_id: int):
+        super().__init__(timeout=120)
+        self.author_id = author_id
+        self.mode: Optional[str] = None  # "overwrite", "add_new", or None (cancelled/timed out)
+        self.message: Optional[discord.Message] = None
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.author_id:
+            await interaction.response.send_message(
+                "Only the command author can use these buttons.",
+                ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Overwrite All", style=discord.ButtonStyle.danger, emoji="♻️")
+    async def overwrite_button(self, interaction: discord.Interaction, button: Button):
+        self.mode = "overwrite"
+        self.stop()
+        await interaction.response.defer()
+
+    @discord.ui.button(label="Add New Only", style=discord.ButtonStyle.primary, emoji="➕")
+    async def add_new_button(self, interaction: discord.Interaction, button: Button):
+        self.mode = "add_new"
+        self.stop()
+        await interaction.response.defer()
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary, emoji="❌")
+    async def cancel_button(self, interaction: discord.Interaction, button: Button):
+        self.mode = None
+        self.stop()
+        await interaction.response.defer()
+
+
+USERINFO_FORMAT = "petcord-userinfo"
+USERINFO_VERSION = 1
+USERINFO_MAX_BYTES = 10 * 1024 * 1024  # Discord's default attachment limit for bots
+
+
+def build_userinfo_export(guild: discord.Guild, users: dict) -> BytesIO:
+    """Build an in-memory JSON export of all Petcord user data for a guild (no server settings)."""
+    payload = {
+        "format": USERINFO_FORMAT,
+        "version": USERINFO_VERSION,
+        "source_guild_id": guild.id,
+        "source_guild_name": guild.name,
+        "exported_at": datetime.now().astimezone().isoformat(),
+        "user_count": len(users),
+        "users": {str(uid): user.model_dump(mode="json") for uid, user in users.items()},
+    }
+    buffer = BytesIO(json.dumps(payload, indent=2, ensure_ascii=False).encode("utf-8"))
+    buffer.seek(0)
+    return buffer
+
+
 async def is_admin(ctx: commands.Context) -> bool:
     """Check if user is a bot admin, bot owner, or has Manage Server permission.
     
@@ -364,7 +423,16 @@ class AdminCommands(MixinMeta):
     async def pcset(self, ctx: Context) -> None:
         """Petcord admin settings and commands."""
         prefix = ctx.clean_prefix
-        cmds = sorted(ctx.command.commands, key=lambda c: c.name)
+        cmds = []
+        for cmd in sorted(ctx.command.commands, key=lambda c: c.name):
+            if cmd.name == "userinfo":
+                # List each userinfo command individually instead of the group
+                cmds.extend(sorted(
+                    (c for c in cmd.walk_commands() if not isinstance(c, commands.Group)),
+                    key=lambda c: c.qualified_name,
+                ))
+            else:
+                cmds.append(cmd)
         cmds_per_page = 10
         total_pages = max(1, -(-len(cmds) // cmds_per_page))
         pages = []
@@ -381,7 +449,7 @@ class AdminCommands(MixinMeta):
                 brief = cmd.brief or (cmd.help.splitlines()[0] if cmd.help else "No description.")
                 aliases = f" | aliases: {', '.join(cmd.aliases)}" if cmd.aliases else ""
                 embed.add_field(
-                    name=f"`{prefix}pcset {cmd.name}`{aliases}",
+                    name=f"`{prefix}{cmd.qualified_name}`{aliases}",
                     value=brief,
                     inline=False,
                 )
@@ -1307,7 +1375,7 @@ class AdminCommands(MixinMeta):
                     item.disabled = True
                 try:
                     await self.message.edit(embed=timeout_embed, view=self)
-                except:
+                except discord.HTTPException:
                     pass
         
         view = DeleteConfirmView(self, ctx, user, user_id, conf)
@@ -1429,7 +1497,7 @@ class AdminCommands(MixinMeta):
                     item.disabled = True
                 try:
                     await self.message.edit(embed=timeout_embed, view=self)
-                except:
+                except discord.HTTPException:
                     pass
         
         view = DeleteAllConfirmView(self, ctx, conf, total_users)
@@ -1820,6 +1888,254 @@ class AdminCommands(MixinMeta):
             await ctx.send("✅ Conversion cooldown removed.")
         else:
             await ctx.send(f"✅ Players must wait **{hours}** hour(s) between conversions.")
+
+    @pcset.group(name="userinfo", invoke_without_command=True)
+    async def pcset_userinfo(self, ctx: Context) -> None:
+        """Export or import Petcord player data.
+
+        Files are created in memory and sent as Discord attachments --
+        nothing is written to the bot host's disk. Server settings are
+        not included.
+        """
+        prefix = ctx.clean_prefix
+        embed = discord.Embed(
+            title="📦 Petcord User Info Commands",
+            description="Move player data between servers using downloadable files.",
+            color=discord.Color.blue(),
+        )
+        embed.add_field(
+            name=f"`{prefix}pcset userinfo export all`",
+            value="Download all player data for this server as a JSON file.",
+            inline=False,
+        )
+        embed.add_field(
+            name=f"`{prefix}pcset userinfo export userlist`",
+            value="Download a CSV of player user IDs and display names.",
+            inline=False,
+        )
+        embed.add_field(
+            name=f"`{prefix}pcset userinfo import`",
+            value="Attach an export file to load player data into this server.",
+            inline=False,
+        )
+        await ctx.send(embed=embed)
+
+    @pcset_userinfo.group(name="export", invoke_without_command=True)
+    async def userinfo_export(self, ctx: Context) -> None:
+        """Export player data as a downloadable file."""
+        prefix = ctx.clean_prefix
+        await ctx.send(
+            f"Choose what to export:\n"
+            f"• `{prefix}pcset userinfo export all` -- all player data (JSON)\n"
+            f"• `{prefix}pcset userinfo export userlist` -- user IDs and display names (CSV)"
+        )
+
+    @userinfo_export.command(name="all")
+    async def userinfo_export_all(self, ctx: Context) -> None:
+        """Export all player data for this server as a JSON file.
+
+        Includes pets, Home, memorial, medals, coins, inventory, and stats.
+        Does not include server settings. Use `pcset userinfo import` on
+        another server to load it.
+        """
+        conf = self.db.get_conf(ctx.guild)
+        if not conf.users:
+            await ctx.send("❌ No players have Petcord data in this server.")
+            return
+
+        buffer = build_userinfo_export(ctx.guild, conf.users)
+        filename = f"petcord_userinfo_{ctx.guild.id}_{datetime.now().strftime('%Y%m%d-%H%M')}.json"
+        await ctx.send(
+            f"📦 Exported **{len(conf.users):,}** players from **{ctx.guild.name}**.\n"
+            f"⚠️ This file contains player data -- keep it private.",
+            file=discord.File(buffer, filename=filename),
+        )
+
+    @userinfo_export.command(name="userlist")
+    async def userinfo_export_userlist(self, ctx: Context) -> None:
+        """Export a CSV of player user IDs and display names."""
+        conf = self.db.get_conf(ctx.guild)
+        if not conf.users:
+            await ctx.send("❌ No players have Petcord data in this server.")
+            return
+
+        text = StringIO()
+        writer = csv.writer(text)
+        writer.writerow(["user_id", "display_name", "in_server"])
+        for uid in conf.users:
+            member = ctx.guild.get_member(uid)
+            if member:
+                writer.writerow([uid, member.display_name, "yes"])
+            else:
+                writer.writerow([uid, "(left server)", "no"])
+
+        # utf-8-sig so Excel shows names with emoji/accents correctly
+        buffer = BytesIO(text.getvalue().encode("utf-8-sig"))
+        filename = f"petcord_userlist_{ctx.guild.id}_{datetime.now().strftime('%Y%m%d-%H%M')}.csv"
+        await ctx.send(
+            f"📋 User list for **{ctx.guild.name}** ({len(conf.users):,} players).",
+            file=discord.File(buffer, filename=filename),
+        )
+
+    @pcset_userinfo.command(name="import")
+    async def userinfo_import(self, ctx: Context) -> None:
+        """Import player data from an attached export file.
+
+        Attach a file from `pcset userinfo export all` to the command message.
+        You'll be asked to choose:
+        - **Overwrite All** - players in the file replace existing players with
+          the same Discord ID; new players are added.
+        - **Add New Only** - only players not already in this server are added;
+          existing players are left untouched.
+
+        A backup of the current player data is posted before anything changes.
+        """
+        from ..common.models import User
+
+        if not ctx.message.attachments:
+            await ctx.send("❌ Attach a Petcord export file (`.json`) to the command message.")
+            return
+
+        attachment = ctx.message.attachments[0]
+        if not attachment.filename.lower().endswith(".json"):
+            await ctx.send("❌ The attached file must be a `.json` export from `pcset userinfo export all`.")
+            return
+        if attachment.size > USERINFO_MAX_BYTES:
+            await ctx.send("❌ That file is too large to be a Petcord export.")
+            return
+
+        # Read and validate the file entirely in memory
+        try:
+            payload = json.loads((await attachment.read()).decode("utf-8-sig"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            await ctx.send("❌ That file isn't valid JSON.")
+            return
+        except discord.HTTPException:
+            await ctx.send("❌ Couldn't download the attachment. Please try again.")
+            return
+
+        if not isinstance(payload, dict) or payload.get("format") != USERINFO_FORMAT:
+            await ctx.send("❌ That file isn't a Petcord user info export.")
+            return
+        if payload.get("version", 0) > USERINFO_VERSION:
+            await ctx.send("❌ That export was made by a newer version of Petcord. Update the cog first.")
+            return
+
+        raw_users = payload.get("users")
+        if not isinstance(raw_users, dict) or not raw_users:
+            await ctx.send("❌ The export doesn't contain any players.")
+            return
+
+        imported: dict = {}
+        failed: list = []
+        for uid_str, data in raw_users.items():
+            try:
+                imported[int(uid_str)] = User.model_validate(data)
+            except Exception:
+                failed.append(uid_str)
+
+        if not imported:
+            await ctx.send("❌ None of the players in that file could be read.")
+            return
+
+        conf = self.db.get_conf(ctx.guild)
+        matching = [uid for uid in imported if uid in conf.users]
+        new = [uid for uid in imported if uid not in conf.users]
+
+        embed = discord.Embed(
+            title="📥 Import Player Data?",
+            description=(
+                f"**Source:** {payload.get('source_guild_name', 'Unknown')} "
+                f"(`{payload.get('source_guild_id', '?')}`)\n"
+                f"**Exported:** {payload.get('exported_at', 'Unknown')}\n\n"
+                f"👥 Players in file: **{len(imported):,}**\n"
+                f"🔁 Already in this server: **{len(matching):,}**\n"
+                f"🆕 New to this server: **{len(new):,}**"
+                + (f"\n⚠️ Unreadable entries skipped: **{len(failed):,}**" if failed else "")
+            ),
+            color=discord.Color.orange(),
+        )
+        embed.add_field(
+            name="Choose an option",
+            value=(
+                f"**♻️ Overwrite All** - replace the {len(matching):,} matching players with the file's data "
+                f"and add the {len(new):,} new players.\n"
+                f"**➕ Add New Only** - add the {len(new):,} new players; existing players are not changed.\n\n"
+                f"A backup of the current data is posted before changes are applied."
+            ),
+            inline=False,
+        )
+
+        view = UserInfoImportConfirmView(ctx.author.id)
+        message = await ctx.send(embed=embed, view=view)
+        view.message = message
+        await view.wait()
+
+        if view.mode is None:
+            await message.edit(
+                embed=discord.Embed(
+                    title="❌ Import Cancelled",
+                    description="No player data was changed.",
+                    color=discord.Color.red(),
+                ),
+                view=None,
+            )
+            return
+
+        if view.mode == "add_new" and not new:
+            await message.edit(
+                embed=discord.Embed(
+                    title="ℹ️ Nothing to Import",
+                    description="Every player in the file already exists in this server. No changes made.",
+                    color=discord.Color.greyple(),
+                ),
+                view=None,
+            )
+            return
+
+        # Post a backup of the current player data before changing anything
+        if conf.users:
+            backup = build_userinfo_export(ctx.guild, conf.users)
+            backup_name = f"petcord_userinfo_BACKUP_{ctx.guild.id}_{datetime.now().strftime('%Y%m%d-%H%M%S')}.json"
+            try:
+                await ctx.send(
+                    "🗃️ Backup of player data **before** this import (re-import it to undo):",
+                    file=discord.File(backup, filename=backup_name),
+                )
+            except discord.HTTPException:
+                await message.edit(
+                    embed=discord.Embed(
+                        title="❌ Import Aborted",
+                        description="Couldn't post the backup file, so no changes were made.",
+                        color=discord.Color.red(),
+                    ),
+                    view=None,
+                )
+                return
+
+        if view.mode == "overwrite":
+            for uid, user in imported.items():
+                conf.users[uid] = user
+            summary = f"♻️ Overwrote **{len(matching):,}** players and added **{len(new):,}** new players."
+        else:
+            for uid in new:
+                conf.users[uid] = imported[uid]
+            summary = f"➕ Added **{len(new):,}** new players. **{len(matching):,}** existing players were left unchanged."
+
+        self.schedule_save()
+
+        await message.edit(
+            embed=discord.Embed(
+                title="✅ Import Complete",
+                description=(
+                    f"{summary}\n\n"
+                    f"Players with a Petcord menu already open should close it and reopen "
+                    f"it with the `petcord` command to see their imported data."
+                ),
+                color=discord.Color.green(),
+            ),
+            view=None,
+        )
 
     @pcset.group(name="blacklist", aliases=["blocklist"], invoke_without_command=True)
     async def pcset_blacklist(self, ctx: Context) -> None:

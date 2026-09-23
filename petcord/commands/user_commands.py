@@ -14,6 +14,7 @@ from ..abc import MixinMeta
 from ..common.utils import is_allowed_channel
 from ..views import MainMenuView, StatsView
 from ..views.gift_views import PetGiftView, PET_TRANSFER_LOCKOUT_SECONDS
+from ..views.game_warning import GameWarningView, build_game_warning_embed
 
 if TYPE_CHECKING:
     pass
@@ -48,9 +49,34 @@ class UserCommands(MixinMeta):
             )
             return
         
+        # First-run warning - must be accepted before playing. Looked up without
+        # get_user() so rejecting leaves no player data behind.
+        existing = guild_settings.users.get(ctx.author.id)
+
+        # Players who already have or have had a pet skip the warning
+        if existing is not None and not existing.accepted_game_warning and (
+            existing.current_pet is not None
+            or existing.home_pets
+            or existing.total_pets_owned > 0
+        ):
+            existing.accepted_game_warning = True
+            self.schedule_save()
+
+        if existing is None or not existing.accepted_game_warning:
+            warning_view = GameWarningView(
+                cog=self,
+                guild_settings=guild_settings,
+                author_id=ctx.author.id
+            )
+            warning_view.message = await ctx.send(
+                embed=build_game_warning_embed(ctx.author),
+                view=warning_view
+            )
+            return
+
         # Get or create user data
         user_data = guild_settings.get_user(ctx.author)
-        
+
         # Create the main menu view
         view = MainMenuView(
             cog=self,

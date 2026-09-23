@@ -48,11 +48,23 @@ class PetNamingModal(Modal):
     
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Handle name submission."""
+        # Prevent a second adoption (e.g. from another open menu) replacing the current pet
+        if self.user_data.current_pet is not None:
+            await interaction.response.send_message(
+                f"❌ You already have a pet (**{self.user_data.current_pet.name}**)! "
+                "You can only raise one pet at a time.",
+                ephemeral=True
+            )
+            return
+
         name = self.name_input.value.strip()
         
-        # Validate name (blacklist check)
-        disallowed = [w.lower() for w in self.guild_settings.disallowed_names]
-        if name.lower() in disallowed:
+        # Validate name (blacklist check) - block the full name or any whole word in it,
+        # so "Big Badword" is caught but "Robot" isn't blocked by "bot"
+        disallowed = {w.lower() for w in self.guild_settings.disallowed_names}
+        name_lower = name.lower()
+        name_words = set(name_lower.replace("-", " ").replace("'", " ").split())
+        if name_lower in disallowed or name_words & disallowed:
             await interaction.response.send_message(
                 "❌ That name is not allowed. Please try again with a different name.",
                 ephemeral=True

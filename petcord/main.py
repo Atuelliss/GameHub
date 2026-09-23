@@ -31,7 +31,7 @@ class Petcord(UserCommands, AdminCommands, commands.Cog, metaclass=CompositeMeta
     Earn medals based on how well you raise your pets!
     """
 
-    __version__ = "0.1.0"
+    __version__ = "1.0.0"
     __author__ = ["Jayar/Vainne"]
 
     def __init__(self, bot: Red) -> None:
@@ -42,6 +42,7 @@ class Petcord(UserCommands, AdminCommands, commands.Cog, metaclass=CompositeMeta
         self._save_task: Optional[asyncio.Task] = None
         self._active_views: Set[View] = set()  # Track active views for cleanup
         self._load_failed: bool = False  # Track if database load failed
+        self._db_loaded: bool = False  # False until the data file has been read (blocks commands and saves)
         self.decay_task: DecayTask = DecayTask(self)
         self.debug_log: list = []  # In-memory debug log for decay tracking
 
@@ -57,6 +58,7 @@ class Petcord(UserCommands, AdminCommands, commands.Cog, metaclass=CompositeMeta
         """Initialize the cog after loading."""
         await self.bot.wait_until_red_ready()
         await self._load_data()
+        self._db_loaded = True
         self.decay_task.start()
         log.info(f"Petcord v{self.__version__} loaded successfully!")
 
@@ -125,6 +127,11 @@ class Petcord(UserCommands, AdminCommands, commands.Cog, metaclass=CompositeMeta
 
     async def save(self) -> None:
         """Save database to disk with retry logic and rotating backups."""
+        # Don't save before the data file has been loaded - the in-memory DB is still empty
+        if not self._db_loaded:
+            log.warning("Save skipped - database has not finished loading yet.")
+            return
+
         # Don't save if load failed - prevents overwriting backup
         if getattr(self, '_load_failed', False):
             log.warning("Save blocked - database load failed. Fix the issue and reload.")
@@ -252,6 +259,15 @@ class Petcord(UserCommands, AdminCommands, commands.Cog, metaclass=CompositeMeta
             await self.save()
 
         self._save_task = asyncio.create_task(delayed_save())
+
+    async def cog_check(self, ctx: commands.Context) -> bool:
+        """Block all Petcord commands until the data file has finished loading."""
+        if not self._db_loaded:
+            # Only reply when a Petcord command is actually being run (not during [p]help filtering)
+            if ctx.command is not None and ctx.command.cog is self:
+                await ctx.send("⏳ Petcord is still loading. Please try again in a few seconds.")
+            return False
+        return True
 
     def format_help_for_context(self, ctx: commands.Context) -> str:
         """Add version info to help text."""
