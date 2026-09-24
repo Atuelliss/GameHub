@@ -1,0 +1,6 @@
+{
+  "author": ["Jayar/Vainne"],
+  "short": "A collection of game cogs for Red-DiscordBot.",
+  "description": "GameHub is a collection of mini-games for Red-DiscordBot: Petcord (virtual pet raising), CrimeTime (crime and heists), DinoCollector (catch and trade dinos), Greenacres Fishing (fishing simulator), HighRollerClub (casino games), and Russian Roulette.",
+  "install_msg": "Thanks for adding GameHub! Use `[p]cog list gamehub` to see the available games, then `[p]cog install gamehub <cog>` to install one."
+}
