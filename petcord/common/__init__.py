@@ -157,24 +157,33 @@ class Base(BaseModel):
         return cls.parse_file(path)
 
     def to_file(self, path: Path) -> None:
-        dump = self.model_dump_json()
-        # We want to write the file as safely as possible
-        tmp_path = path.parent / f"{path.stem}-{uuid4().fields[0]}.tmp"
-        with tmp_path.open(encoding="utf-8", mode="w") as fs:
-            fs.write(dump)
-            fs.flush()
-            os.fsync(fs.fileno())
+        write_json_atomic(path, self.model_dump_json())
 
-        # Replace the original file with the new content
+
+def write_json_atomic(path: Path, dump: str) -> None:
+    """
+    Write already-serialized JSON to `path` as safely as possible.
+
+    Safe to run in a worker thread: it only touches the string, never the models.
+    Serialize with model_dump_json() on the event loop first, so the snapshot can't
+    change halfway through while commands and tasks keep modifying the data.
+    """
+    tmp_path = path.parent / f"{path.stem}-{uuid4().fields[0]}.tmp"
+    with tmp_path.open(encoding="utf-8", mode="w") as fs:
+        fs.write(dump)
+        fs.flush()
+        os.fsync(fs.fileno())
+
+    # Replace the original file with the new content
+    try:
+        tmp_path.replace(path)
+    except FileNotFoundError as e:
+        log.error(f"Failed to rename {tmp_path} to {path}", exc_info=e)
+
+    # Ensure directory fsync for better durability
+    if hasattr(os, "O_DIRECTORY"):
+        fd = os.open(path.parent, os.O_DIRECTORY)
         try:
-            tmp_path.replace(path)
-        except FileNotFoundError as e:
-            log.error(f"Failed to rename {tmp_path} to {path}", exc_info=e)
-
-        # Ensure directory fsync for better durability
-        if hasattr(os, "O_DIRECTORY"):
-            fd = os.open(path.parent, os.O_DIRECTORY)
-            try:
-                os.fsync(fd)
-            finally:
-                os.close(fd)
+            os.fsync(fd)
+        finally:
+            os.close(fd)

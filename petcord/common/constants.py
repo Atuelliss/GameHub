@@ -137,7 +137,7 @@ COOLDOWN_TREAT = 24
 COOLDOWN_PET = 0.5
 
 # Owner Sleep (decay pause) duration in hours
-OWNER_SLEEP_DURATION_HOURS = 6
+OWNER_SLEEP_DURATION_HOURS = 8
 
 # Shop Treats cooldown and stack limits
 SHOP_TREAT_COOLDOWN_HOURS = 6

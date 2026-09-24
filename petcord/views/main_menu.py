@@ -756,7 +756,7 @@ class PetActionButton(CareActionButton):
 
 
 class OwnerSleepButton(Button):
-    """Button to pause decay for 6 hours (once per calendar day)."""
+    """Button to pause decay for OWNER_SLEEP_DURATION_HOURS (once per calendar day)."""
     
     def __init__(self, pet=None, guild_settings=None):
         import time

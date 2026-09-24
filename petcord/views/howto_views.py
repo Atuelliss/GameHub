@@ -19,6 +19,7 @@ from ..common.constants import (
     COOLDOWN_REST, COOLDOWN_TREAT, COOLDOWN_PET,
     REST_DECAY_MAX_REDUCTION,
     ACTION_EFFECTS,
+    OWNER_SLEEP_DURATION_HOURS,
 )
 
 
@@ -382,7 +383,7 @@ class HowToView(View):
         embed.add_field(
             name="💤 Owner Sleep",
             value=(
-                "Need a break? Use the **Owner Sleep** button to pause all stat decay for **6 hours**!\n"
+                f"Need a break? Use the **Owner Sleep** button to pause all stat decay for **{OWNER_SLEEP_DURATION_HOURS} hours**!\n"
                 "• Can be used **once per calendar day**\n"
                 "• Stats stay exactly where they are while you rest\n"
                 "• Perfect for overnight breaks"

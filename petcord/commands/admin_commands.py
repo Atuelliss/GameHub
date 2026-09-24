@@ -484,27 +484,49 @@ class AdminCommands(MixinMeta):
     
     @pcset.command(name="cleartimer", aliases=["clearcd", "resetcooldown"])
     async def pcset_cleartimer(self, ctx: Context, user: discord.Member) -> None:
-        """Clear the pet finding and Petcoin conversion cooldowns for a user.
-        
-        This removes the cooldown that occurs when a user passes on a pet,
-        and the wait between Petcoin conversions.
-        
+        """Clear all cooldowns for a user.
+
+        This resets:
+        - Pet finding cooldown (from declining pets)
+        - Petcoin conversion cooldown
+        - Care action cooldowns (feed, play, groom, rest, treat, pet) on their
+          current pet and home pets
+
         **Arguments:**
         - `<user>` - The user to clear the cooldowns for.
         """
         conf = self.db.get_conf(ctx.guild)
         user_data = conf.get_user(user)
-        
-        if user_data.last_pet_declined <= 0 and user_data.last_petcoin_conversion <= 0:
+
+        care_attrs = (
+            "last_fed", "last_played", "last_groomed",
+            "last_rested", "last_treated", "last_petted",
+        )
+        pets = list(user_data.home_pets)
+        if user_data.current_pet:
+            pets.append(user_data.current_pet)
+
+        has_care_timer = any(
+            (getattr(pet, attr, 0) or 0) > 0 for pet in pets for attr in care_attrs
+        )
+        if (
+            user_data.last_pet_declined <= 0
+            and user_data.last_petcoin_conversion <= 0
+            and not has_care_timer
+        ):
             await ctx.send(f"⏱️ **{user.display_name}** doesn't have an active cooldown.")
             return
-        
+
         user_data.last_pet_declined = 0
         user_data.last_petcoin_conversion = 0
+        for pet in pets:
+            for attr in care_attrs:
+                setattr(pet, attr, 0)
         self.schedule_save()
-        
+
         await ctx.send(
-            f"✅ Cleared the pet finding and Petcoin conversion cooldowns for **{user.display_name}**."
+            f"✅ Cleared all cooldowns (pet finding, Petcoin conversion, and care actions) "
+            f"for **{user.display_name}**."
         )
     
     @pcset.command(name="clearalltimers")

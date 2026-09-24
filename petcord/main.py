@@ -15,6 +15,7 @@ from redbot.core.data_manager import cog_data_path
 
 from .abc import CompositeMetaClass
 from .commands import UserCommands, AdminCommands
+from .common import write_json_atomic
 from .common.models import DB
 from .tasks import DecayTask
 from .views.persistent_views import StaleMainMenuView
@@ -146,7 +147,11 @@ class Petcord(UserCommands, AdminCommands, commands.Cog, metaclass=CompositeMeta
                     # Create rotating backup before saving
                     await self._create_rotating_backup()
                     
-                    await asyncio.to_thread(self.db.to_file, self.data_path)
+                    # Serialize on the event loop: the snapshot can't change halfway through,
+                    # which it could if model_dump_json ran in a thread while commands and the
+                    # decay task edit the data. Only the file write runs in the thread.
+                    dump = self.db.model_dump_json()
+                    await asyncio.to_thread(write_json_atomic, self.data_path, dump)
                     log.debug("Database saved successfully")
                     return
             except Exception as e:
