@@ -10,7 +10,7 @@
   "permissions": ["administrator"],
   "required_cogs": {},
   "requirements": ["pydantic"],
-  "short": "",
+  "short": "Ark-themed creature collector game.",
   "tags": [],
   "type": "COG"
 }

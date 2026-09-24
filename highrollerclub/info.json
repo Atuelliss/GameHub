@@ -10,7 +10,7 @@
   "permissions": ["administrator"],
   "required_cogs": {},
   "requirements": ["pydantic"],
-  "short": "",
+  "short": "Vegas-style Casino Game",
   "tags": [],
   "type": "COG"
 }
