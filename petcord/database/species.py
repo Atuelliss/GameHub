@@ -2135,6 +2135,26 @@ SPECIES_DATABASE["red_panda"] = SpeciesData(
     unique_interaction_effect="+Cuteness++, +Entertainment"
 )
 
+SPECIES_DATABASE["giant_panda"] = SpeciesData(
+    id="giant_panda",
+    name="Giant Panda",
+    emoji="🐼",
+    category="exotic",
+    rarity="mythical",
+    activity_level="low",
+    social_need="solitary",
+    grooming_need="moderate",
+    diet_type="herbivore",
+    lifespan="medium",
+    care_difficulty="expert",
+    possible_coats=["Black and white", "Brown and white"],
+    possible_patterns=["Eye patches"],
+    special_needs="Zoo/sanctuary only, huge bamboo diet, cool climate, climbing",
+    temperament="Gentle, solitary, playful tumbler, loves to nap",
+    unique_interaction="Bamboo munch",
+    unique_interaction_effect="+Cuteness++, +Relaxation"
+)
+
 
 # =============================================================================
 # DECAY MULTIPLIERS BY CATEGORY
