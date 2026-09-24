@@ -31,7 +31,7 @@ class Petcord(UserCommands, AdminCommands, commands.Cog, metaclass=CompositeMeta
     Earn medals based on how well you raise your pets!
     """
 
-    __version__ = "1.0.0"
+    __version__ = "1.0.9"
     __author__ = ["Jayar/Vainne"]
 
     def __init__(self, bot: Red) -> None:

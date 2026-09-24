@@ -39,6 +39,8 @@ STEP_DESCRIPTIONS: Dict[int, str] = {
     1: (
         "Select the **notification channel** where Petcord will announce events "
         "such as pet deaths.\n\n"
+        "Don't see your channel? Type its name in the dropdown to search, or use "
+        "**Enter Channel ID** to paste a channel ID or #mention.\n\n"
         "This is optional — use **Skip** to leave it unset for now."
     ),
     2: (
@@ -215,8 +217,8 @@ class _HomeCapacityModal(discord.ui.Modal, title="Set Home Capacity"):
 class _ChannelSelect(discord.ui.ChannelSelect):
     def __init__(self, wizard: "PetcordSetupView") -> None:
         super().__init__(
-            placeholder="Select a text channel…",
-            channel_types=[discord.ChannelType.text],
+            placeholder="Select or type to search for a channel…",
+            channel_types=[discord.ChannelType.text, discord.ChannelType.news],
             min_values=1,
             max_values=1,
             row=0,
@@ -229,6 +231,45 @@ class _ChannelSelect(discord.ui.ChannelSelect):
         self.wizard.cog.schedule_save()
         self.wizard.completed[1] = f"<#{channel.id}>"
         await self.wizard._advance(interaction)
+
+
+class _ChannelIdModal(discord.ui.Modal, title="Enter Channel ID"):
+    channel_input: discord.ui.TextInput = discord.ui.TextInput(
+        label="Channel ID or #mention",
+        placeholder="e.g. 123456789012345678 or <#123456789012345678>",
+        min_length=1,
+        max_length=40,
+        required=True,
+    )
+
+    def __init__(self, wizard: "PetcordSetupView") -> None:
+        super().__init__()
+        self.wizard = wizard
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        digits = "".join(ch for ch in self.channel_input.value if ch.isdigit())
+        channel = interaction.guild.get_channel(int(digits)) if digits else None
+
+        if not isinstance(channel, discord.TextChannel):
+            await interaction.response.send_message(
+                "❌ No text or announcement channel with that ID was found in this server.",
+                ephemeral=True,
+            )
+            return
+
+        perms = channel.permissions_for(interaction.guild.me)
+        if not (perms.view_channel and perms.send_messages):
+            await interaction.response.send_message(
+                f"❌ I can't send messages in {channel.mention}. "
+                "Check my permissions there, or choose another channel.",
+                ephemeral=True,
+            )
+            return
+
+        self.wizard.conf.allowed_channel_id = channel.id
+        self.wizard.cog.schedule_save()
+        self.wizard.completed[1] = f"<#{channel.id}>"
+        await self.wizard._advance(interaction, from_modal=True)
 
 
 # ---------------------------------------------------------------------------
@@ -330,6 +371,7 @@ class PetcordSetupView(View):
 
         if step == 1:
             self.add_item(_ChannelSelect(self))
+            self._add_channel_id_button()
             self._add_skip_button()
         elif step == 2:
             self._add_capacity_button()
@@ -365,6 +407,15 @@ class PetcordSetupView(View):
 
         if step > 1:
             self._add_back_button()
+
+    def _add_channel_id_button(self) -> None:
+        btn = Button(label="Enter Channel ID", emoji="🔢", style=discord.ButtonStyle.primary, row=1)
+
+        async def cb(interaction: discord.Interaction) -> None:
+            await interaction.response.send_modal(_ChannelIdModal(self))
+
+        btn.callback = cb
+        self.add_item(btn)
 
     def _add_skip_button(self) -> None:
         btn = Button(label="Skip", style=discord.ButtonStyle.secondary, row=1)
