@@ -65,7 +65,7 @@ def calculate_conversion(
     Work out how much of a requested Petcoin amount can actually be converted.
 
     Returns:
-        (petcoin_used, currency_received, note) -- note explains any limit applied,
+        (petcoin_used, currency_received, note). The note explains any limit applied,
         or why nothing can be converted when petcoin_used is 0.
     """
     rate = max(1, settings.petcoin_conversion_rate)
@@ -263,7 +263,7 @@ class PetcoinConvertView(View):
         member = interaction.user
 
         async with _get_lock(interaction.guild_id, member.id):
-            # Re-check everything -- settings or balance may have changed since the view opened
+            # Re-check everything, since settings or balance may have changed after the view opened
             if not settings.petcoin_conversion_enabled:
                 self.stop()
                 await interaction.response.edit_message(
@@ -311,7 +311,7 @@ class PetcoinConvertView(View):
                 )
                 return
 
-            # Deposit succeeded -- now take the Petcoin and record the conversion
+            # Deposit succeeded, so now take the Petcoin and record the conversion
             today = get_conversion_day(settings)
             if user.conversion_day != today:
                 user.conversion_day = today

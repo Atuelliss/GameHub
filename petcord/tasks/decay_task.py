@@ -572,7 +572,7 @@ class DecayTask:
         pet = user_data.current_pet
         current_time = time.time()
         
-        log.info(f"Pet {pet.name} (user {user_id}) died from {cause}")
+        log.debug(f"Pet {pet.name} (user {user_id}) died from {cause}")
         
         # Create memorial entry
         memorial = PetMemorial(
@@ -716,7 +716,7 @@ class DecayTask:
         if new_stage != pet.life_stage:
             old_stage = pet.life_stage
             pet.life_stage = new_stage
-            log.info(f"Pet {pet.name} grew from {old_stage} to {new_stage}!")
+            log.debug(f"Pet {pet.name} grew from {old_stage} to {new_stage}!")
             
             # Mark as ready to graduate when reaching adult
             if new_stage == "adult" and not pet.reached_adult_timestamp:
@@ -758,7 +758,7 @@ class DecayTask:
             # Check for stage transition (adult -> senior)
             if pet.life_stage == "adult" and pet.age_days >= thresholds.get("senior", 21):
                 pet.life_stage = "senior"
-                log.info(f"Home pet {pet.name} became a senior!")
+                log.debug(f"Home pet {pet.name} became a senior!")
             
             # Check for natural death (50% beyond senior threshold)
             max_age = thresholds.get("max_age", thresholds.get("senior", 21) * 1.5)
@@ -780,7 +780,7 @@ class DecayTask:
         
         current_time = time.time()
         
-        log.info(f"Home pet {pet.name} (user {user_id}) passed away peacefully of old age")
+        log.debug(f"Home pet {pet.name} (user {user_id}) passed away peacefully of old age")
         
         # Create memorial entry
         memorial = PetMemorial(

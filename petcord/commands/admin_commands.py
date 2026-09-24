@@ -1893,8 +1893,8 @@ class AdminCommands(MixinMeta):
     async def pcset_userinfo(self, ctx: Context) -> None:
         """Export or import Petcord player data.
 
-        Files are created in memory and sent as Discord attachments --
-        nothing is written to the bot host's disk. Server settings are
+        Files are created in memory and sent as Discord attachments.
+        Nothing is written to the bot host's disk. Server settings are
         not included.
         """
         prefix = ctx.clean_prefix
@@ -1926,8 +1926,8 @@ class AdminCommands(MixinMeta):
         prefix = ctx.clean_prefix
         await ctx.send(
             f"Choose what to export:\n"
-            f"• `{prefix}pcset userinfo export all` -- all player data (JSON)\n"
-            f"• `{prefix}pcset userinfo export userlist` -- user IDs and display names (CSV)"
+            f"• `{prefix}pcset userinfo export all`: all player data (JSON)\n"
+            f"• `{prefix}pcset userinfo export userlist`: user IDs and display names (CSV)"
         )
 
     @userinfo_export.command(name="all")
@@ -1947,7 +1947,7 @@ class AdminCommands(MixinMeta):
         filename = f"petcord_userinfo_{ctx.guild.id}_{datetime.now().strftime('%Y%m%d-%H%M')}.json"
         await ctx.send(
             f"📦 Exported **{len(conf.users):,}** players from **{ctx.guild.name}**.\n"
-            f"⚠️ This file contains player data -- keep it private.",
+            f"⚠️ This file contains player data. Keep it private.",
             file=discord.File(buffer, filename=filename),
         )
 
