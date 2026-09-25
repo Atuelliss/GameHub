@@ -2644,6 +2644,17 @@ class AdminCommands(MixinMeta):
             
             await ctx.send(embed=embed)
 
+    @pcset.command(name="petlist", aliases=["pets", "allpets"])
+    async def pcset_petlist(self, ctx: Context) -> None:
+        """Browse every species with its generate ID and lifespan.
+
+        Choose a sort order, then page through all species. Each entry shows
+        the display name, the ID used with `[p]pcset generate`, and the
+        lifespan (days to reach Adult and total life).
+        """
+        view = PetListView(ctx=ctx)
+        view.message = await ctx.send(embed=view.build_embed(), view=view)
+
     @pcset.command(name="tease")
     async def pcset_tease(self, ctx: Context, user: discord.Member) -> None:
         """Send a fake abandon message to tease a user (just for fun!).
@@ -3518,6 +3529,203 @@ class ListPlayersView(View):
         )
         return False
     
+    async def on_timeout(self) -> None:
+        """Handle view timeout."""
+        if self.message:
+            try:
+                for item in self.children:
+                    item.disabled = True
+                await self.message.edit(view=self)
+            except discord.NotFound:
+                pass
+
+
+# =============================================================================
+# PET LIST PAGINATION VIEW
+# =============================================================================
+
+SPECIES_LIST_PER_PAGE = 10  # 2 lines per species
+
+
+class PetListView(View):
+    """Sort picker plus paginated list of all species for admins."""
+
+    def __init__(self, ctx: Context, timeout: float = 180):
+        super().__init__(timeout=timeout)
+        self.ctx = ctx
+        self.sort_mode: Optional[str] = None  # None = sort picker, "name" or "raise"
+        self.species_list: list = []
+        self.current_page = 0
+        self.total_pages = 1
+        self.message: Optional[discord.Message] = None
+
+        self._setup_buttons()
+
+    def _setup_buttons(self) -> None:
+        """Show sort buttons on the picker screen, pagination buttons otherwise."""
+        self.clear_items()
+
+        if self.sort_mode is None:
+            name_btn = Button(label="By Name", emoji="🔤", style=discord.ButtonStyle.primary, row=0)
+            name_btn.callback = self._sort_by_name
+            self.add_item(name_btn)
+
+            raise_btn = Button(label="By Raise Time", emoji="⏳", style=discord.ButtonStyle.primary, row=0)
+            raise_btn.callback = self._sort_by_raise
+            self.add_item(raise_btn)
+        else:
+            prev_btn = Button(
+                label="◀",
+                style=discord.ButtonStyle.secondary,
+                disabled=self.total_pages <= 1,
+                row=0
+            )
+            prev_btn.callback = self._prev_page
+            self.add_item(prev_btn)
+
+            back_btn = Button(label="Sort", emoji="🔙", style=discord.ButtonStyle.secondary, row=0)
+            back_btn.callback = self._back
+            self.add_item(back_btn)
+
+            next_btn = Button(
+                label="▶",
+                style=discord.ButtonStyle.secondary,
+                disabled=self.total_pages <= 1,
+                row=0
+            )
+            next_btn.callback = self._next_page
+            self.add_item(next_btn)
+
+        close_btn = Button(label="Close", emoji="❌", style=discord.ButtonStyle.danger, row=0)
+        close_btn.callback = self._close
+        self.add_item(close_btn)
+
+    def _apply_sort(self, mode: str) -> None:
+        """Sort species by name or by days to reach Adult (then name)."""
+        import math
+        from ..common.constants import STAGE_THRESHOLDS
+        from ..database.species import get_all_species
+
+        species = get_all_species()
+        if mode == "name":
+            species.sort(key=lambda s: s.name.lower())
+        else:
+            species.sort(
+                key=lambda s: (
+                    STAGE_THRESHOLDS.get(s.lifespan, STAGE_THRESHOLDS["medium"])["adult"],
+                    s.name.lower(),
+                )
+            )
+
+        self.sort_mode = mode
+        self.species_list = species
+        self.current_page = 0
+        self.total_pages = max(1, math.ceil(len(species) / SPECIES_LIST_PER_PAGE))
+        self._setup_buttons()
+
+    async def _sort_by_name(self, interaction: discord.Interaction) -> None:
+        self._apply_sort("name")
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def _sort_by_raise(self, interaction: discord.Interaction) -> None:
+        self._apply_sort("raise")
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def _back(self, interaction: discord.Interaction) -> None:
+        """Return to the sort picker."""
+        self.sort_mode = None
+        self._setup_buttons()
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def _prev_page(self, interaction: discord.Interaction) -> None:
+        """Go to previous page (wraps around)."""
+        if self.current_page > 0:
+            self.current_page -= 1
+        else:
+            self.current_page = self.total_pages - 1
+
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def _next_page(self, interaction: discord.Interaction) -> None:
+        """Go to next page (wraps around)."""
+        if self.current_page < self.total_pages - 1:
+            self.current_page += 1
+        else:
+            self.current_page = 0
+
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    async def _close(self, interaction: discord.Interaction) -> None:
+        """Close the view."""
+        self.stop()
+        await interaction.response.edit_message(view=None)
+
+    def build_embed(self) -> discord.Embed:
+        """Build the sort picker embed or the current species page."""
+        from ..common.constants import STAGE_THRESHOLDS
+
+        prefix = self.ctx.clean_prefix
+
+        if self.sort_mode is None:
+            return discord.Embed(
+                title="🐾 Pet List",
+                description=(
+                    "Choose how to sort the species list:\n\n"
+                    "🔤 **By Name** - Alphabetical order\n"
+                    "⏳ **By Raise Time** - Fewest days to reach Adult first\n\n"
+                    f"Each entry shows the ID to use with `{prefix}pcset generate`."
+                ),
+                color=discord.Color.blue()
+            )
+
+        sort_label = "By Name" if self.sort_mode == "name" else "By Raise Time"
+        if self.total_pages > 1:
+            title = f"🐾 Pet List - {sort_label} (Page {self.current_page + 1}/{self.total_pages})"
+        else:
+            title = f"🐾 Pet List - {sort_label}"
+
+        embed = discord.Embed(title=title, color=discord.Color.blue())
+
+        start_idx = self.current_page * SPECIES_LIST_PER_PAGE
+        page_species = self.species_list[start_idx:start_idx + SPECIES_LIST_PER_PAGE]
+
+        lines = []
+        for sp in page_species:
+            thresholds = STAGE_THRESHOLDS.get(sp.lifespan, STAGE_THRESHOLDS["medium"])
+            lines.append(f"{sp.emoji} **{sp.name}** · `{sp.id}`")
+            lines.append(
+                f"  └ {sp.lifespan.title()} lifespan · Adult at day {thresholds['adult']}"
+                f" · Lives ~{thresholds['max_age']} days"
+            )
+
+        embed.description = "\n".join(lines) if lines else "No species found."
+
+        total = len(self.species_list)
+        embed.set_footer(text=f"Total: {total} species | Use {prefix}pcset generate <user> <id>")
+
+        return embed
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        """Ensure only admins can interact."""
+        # Allow the original command author
+        if interaction.user.id == self.ctx.author.id:
+            return True
+
+        # Also allow other admins (bot owner, Red admin, or Manage Server)
+        user = interaction.user
+        if await self.ctx.bot.is_owner(user):
+            return True
+        if isinstance(user, discord.Member) and user.guild_permissions.manage_guild:
+            return True
+        if await self.ctx.bot.is_admin(user):
+            return True
+
+        await interaction.response.send_message(
+            "Only admins can use this view.",
+            ephemeral=True
+        )
+        return False
+
     async def on_timeout(self) -> None:
         """Handle view timeout."""
         if self.message:

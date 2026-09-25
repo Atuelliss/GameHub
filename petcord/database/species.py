@@ -1795,6 +1795,26 @@ SPECIES_DATABASE["chilean_rose_tarantula"] = SpeciesData(
     unique_interaction_effect="+Achievement, +Growth"
 )
 
+SPECIES_DATABASE["jumping_spider"] = SpeciesData(
+    id="jumping_spider",
+    name="Jumping Spider",
+    emoji="🕷️",
+    category="exotic",
+    rarity="uncommon",
+    activity_level="high",
+    social_need="low",
+    grooming_need="minimal",
+    diet_type="carnivore",
+    lifespan="short",
+    care_difficulty="easy",
+    possible_coats=["Black", "Gray", "Tan", "Iridescent Green", "Peacock Blue"],
+    possible_patterns=["Fuzzy Spotted", "Striped", "Rainbow Fangs", "Heart-shaped markings", "Fluffy eyebrows"],
+    special_needs="Vertical enclosure, live insects, light misting, web hammock",
+    temperament="Curious, big-eyed, tracks you around the room, pounces playfully",
+    unique_interaction="Head tilt",
+    unique_interaction_effect="+Cuteness++, +Entertainment"
+)
+
 SPECIES_DATABASE["praying_mantis"] = SpeciesData(
     id="praying_mantis",
     name="Praying Mantis",
