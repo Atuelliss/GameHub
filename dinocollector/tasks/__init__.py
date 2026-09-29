@@ -56,10 +56,18 @@ class TaskLoops(metaclass=CompositeMetaClass):
                 # Select a channel
                 target_channel = None
                 if conf.allowed_channels:
+                    # Drop allowed channels that no longer exist (deleted channels can't be removed via command)
+                    dead_ids = [cid for cid in conf.allowed_channels if guild.get_channel(cid) is None]
+                    if dead_ids:
+                        conf.allowed_channels = [cid for cid in conf.allowed_channels if cid not in dead_ids]
+                        self.save()
+                        log.warning(f"Removed deleted allowed channels for {guild.name}: {dead_ids}")
+
+                if conf.allowed_channels:
                     # Pick random from allowed
                     valid_channels = [guild.get_channel(cid) for cid in conf.allowed_channels]
                     valid_channels = [c for c in valid_channels if c and isinstance(c, discord.TextChannel)]
-                    
+
                     if valid_channels:
                         # If multiple channels, avoid the last one
                         if len(valid_channels) > 1 and conf.last_spawn_channel_id:
@@ -73,11 +81,19 @@ class TaskLoops(metaclass=CompositeMetaClass):
                     else:
                         log.warning(f"No valid channels found for {guild.name} despite allowed_channels being set! IDs: {conf.allowed_channels}")
                 else:
-                    # Pick random text channel
-                    text_channels = [c for c in guild.channels if isinstance(c, discord.TextChannel)]
+                    # Pick random text channel the bot can actually post in
+                    text_channels = [
+                        c for c in guild.channels
+                        if isinstance(c, discord.TextChannel) and c.permissions_for(guild.me).send_messages
+                    ]
                     if text_channels:
                         target_channel = random.choice(text_channels)
-                
+
+                if not target_channel:
+                    # Nothing to spawn in - wait a full interval before retrying instead of every tick
+                    conf.last_spawn = time.time()
+                    continue
+
                 if target_channel:
                     result = select_random_creature(
                         event_mode_enabled=conf.event_mode_enabled,
@@ -93,10 +109,14 @@ class TaskLoops(metaclass=CompositeMetaClass):
                             conf.last_spawn_channel_id = target_channel.id
                             self.save()
                         except discord.Forbidden:
+                            # Back off a full interval so a broken guild doesn't retry every tick
+                            conf.last_spawn = time.time()
                             log.warning(f"Missing permissions to send in {target_channel.name} ({guild.name})")
                         except discord.HTTPException as e:
+                            conf.last_spawn = time.time()
                             log.warning(f"HTTP error sending spawn in {guild.name}: {e}")
                         except (aiohttp.ClientError, asyncio.TimeoutError, OSError) as e:
+                            conf.last_spawn = time.time()
                             log.warning(f"Network error sending spawn in {guild.name}: {e}")
             except Exception as e:
                 log.exception(f"Unexpected error in spawn loop for guild {guild.name} ({guild.id})", exc_info=e)

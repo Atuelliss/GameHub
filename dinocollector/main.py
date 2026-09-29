@@ -1293,11 +1293,24 @@ class DinoCollector(
         await ctx.send(f"{channel.mention} added to allowed channels.")
 
     @dc_channel.command(name="remove")
-    async def dc_channel_remove(self, ctx: commands.Context, channel: discord.TextChannel):
-        """Remove a channel from the allowed list."""
-        self.remove_allowed_channel(ctx.guild, channel.id)
+    async def dc_channel_remove(self, ctx: commands.Context, channel: str):
+        """Remove a channel from the allowed list.
+
+        Accepts a channel mention or a raw channel ID, so deleted channels can still be removed.
+        """
+        digits = channel.strip("<#>")
+        if not digits.isdigit():
+            await ctx.send("Please provide a channel mention or channel ID.")
+            return
+
+        channel_id = int(digits)
+        if channel_id not in self.get_allowed_channels(ctx.guild):
+            await ctx.send(f"`{channel_id}` is not in the allowed channels list.")
+            return
+
+        self.remove_allowed_channel(ctx.guild, channel_id)
         self.save()
-        await ctx.send(f"{channel.mention} removed from allowed channels.")
+        await ctx.send(f"<#{channel_id}> (`{channel_id}`) removed from allowed channels.")
 
     @dc_channel.command(name="list")
     async def dc_channel_list(self, ctx: commands.Context):

@@ -50,8 +50,11 @@ class MessageListeners(MixinMeta):
                         conf.last_spawn_channel_id = message.channel.id
                         self.save()
                 except discord.Forbidden:
+                    # Start the cooldown anyway so every message doesn't retry and re-log
+                    conf.last_spawn = time.time()
                     log.warning(f"Missing permissions to send spawn in {message.channel.name} ({message.guild.name})")
                 except discord.HTTPException as e:
+                    conf.last_spawn = time.time()
                     log.warning(f"HTTP error sending spawn in {message.guild.name}: {e}")
                 except Exception as e:
                     log.exception(f"Unexpected error in message spawn for {message.guild.name}", exc_info=e)
