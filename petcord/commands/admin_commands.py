@@ -2411,7 +2411,10 @@ class AdminCommands(MixinMeta):
         This generates a pet offer for the target user with the exact
         species, coat color, and pattern you specify. The user can then
         choose to adopt or pass on the pet.
-        
+
+        The offer is posted in the configured Petcord channel (see
+        `pcset channel`), or in the current channel if none is set.
+
         **Arguments:**
         - `<user>` - The user to offer the pet to.
         - `<species_id>` - The species ID (e.g., "scottish_fold", "golden_retriever").
@@ -2559,12 +2562,23 @@ class AdminCommands(MixinMeta):
         embed = view.build_embed()
         embed.set_footer(text=f"🎁 Gift from {ctx.author.display_name} | Only {user.display_name} can adopt")
         
-        view.message = await ctx.send(
+        # Post the offer in the configured Petcord channel so the user can see it,
+        # falling back to the invoking channel if none is set or it's unusable
+        target_channel = ctx.channel
+        if conf.allowed_channel_id:
+            configured = ctx.guild.get_channel(conf.allowed_channel_id)
+            if configured and configured.permissions_for(ctx.guild.me).send_messages:
+                target_channel = configured
+
+        view.message = await target_channel.send(
             content=f"🎁 {user.mention}, a pet has been offered to you!",
             embed=embed,
             view=view
         )
-    
+
+        if target_channel != ctx.channel:
+            await ctx.send(f"✅ Offer sent to **{user.display_name}** in {target_channel.mention}.")
+
     @pcset.command(name="species", aliases=["listspecies", "specieslist"])
     async def pcset_species(self, ctx: Context, category: Optional[str] = None) -> None:
         """List available species IDs for the generate command.
