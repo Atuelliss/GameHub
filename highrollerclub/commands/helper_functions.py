@@ -346,7 +346,13 @@ def record_loss(
 
     user.game_play_counts[game_slug] = user.game_play_counts.get(game_slug, 0) + 1
     user.game_loss_counts[game_slug] = user.game_loss_counts.get(game_slug, 0) + 1
-    add_wagered(user, game_slug, amount_lost if wagered is None else wagered)
+    staked = amount_lost if wagered is None else wagered
+    add_wagered(user, game_slug, staked)
+    # What actually left the player's balance: never more than they staked
+    # (a free spin that loses costs nothing).
+    lost = max(0, min(amount_lost, staked))
+    user.total_lost += lost
+    user.game_total_lost[game_slug] = user.game_total_lost.get(game_slug, 0) + lost
 
     if amount_lost > user.largest_single_loss:
         user.largest_single_loss = amount_lost
