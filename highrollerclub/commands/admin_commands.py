@@ -1338,6 +1338,72 @@ class _Page11GameToggles(_WizardPageBase):
 
 
 # ---------------------------------------------------------------------------
+# Typed channel entry (fallback for the dropdowns)
+# ---------------------------------------------------------------------------
+
+def _resolve_text_channels(guild: discord.Guild, raw: str) -> tuple[list[discord.TextChannel], list[str]]:
+    """Turn typed entries (#mention, ID or name; separated by commas or spaces) into text channels.
+
+    Returns the channels found, in order without repeats, and an error line for each entry that
+    didn't match exactly one text channel."""
+    found: list[discord.TextChannel] = []
+    problems: list[str] = []
+    for entry in raw.replace(",", " ").split():
+        token = entry.strip()
+        if token.startswith("<#") and token.endswith(">"):
+            token = token[2:-1]
+        token = token.lstrip("#")
+        if not token:
+            continue
+        if token.isdigit():
+            channel = guild.get_channel(int(token))
+            if isinstance(channel, discord.TextChannel):
+                matches = [channel]
+            else:
+                matches = []
+        else:
+            needle = token.casefold()
+            matches = [c for c in guild.text_channels if c.name.casefold() == needle]
+        if len(matches) == 1:
+            if matches[0] not in found:
+                found.append(matches[0])
+        elif len(matches) > 1:
+            problems.append(f"`{entry}` matches {len(matches)} channels. Use its #mention or ID instead.")
+        else:
+            problems.append(f"`{entry}` isn't a text channel in this server.")
+    return found, problems
+
+
+class _ChannelEntryModal(discord.ui.Modal):
+    """Type one or more channels by #mention, ID or name. Fills .channels on success."""
+
+    def __init__(self, title: str, multiple: bool) -> None:
+        super().__init__(title=title, timeout=300)
+        self._multiple = multiple
+        self.entry = discord.ui.TextInput(
+            label="Channels (#mention, ID or name)" if multiple else "Channel (#mention, ID or name)",
+            placeholder="general, 123456789012345678, #casino" if multiple else "#casino  or  123456789012345678",
+            style=discord.TextStyle.paragraph if multiple else discord.TextStyle.short,
+            max_length=1000 if multiple else 100,
+        )
+        self.add_item(self.entry)
+        self.channels: list[discord.TextChannel] | None = None
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        found, problems = _resolve_text_channels(interaction.guild, self.entry.value)
+        if not self._multiple and len(found) > 1:
+            problems.append("Enter just one channel here.")
+        if problems or not found:
+            lines = problems or ["No channel was entered."]
+            await interaction.response.send_message(
+                "❌ " + "\n❌ ".join(lines) + "\nNothing was changed.", ephemeral=True
+            )
+            return
+        self.channels = found
+        await interaction.response.defer()
+
+
+# ---------------------------------------------------------------------------
 # Channel Add Sub-Page
 # ---------------------------------------------------------------------------
 
@@ -1413,6 +1479,10 @@ class _ChannelAddSelectView(discord.ui.View):
         next_btn.callback = self._next_page
         self.add_item(next_btn)
 
+        type_btn = discord.ui.Button(label="\u2328\ufe0f Type Channels", style=discord.ButtonStyle.blurple, row=2)
+        type_btn.callback = self._type_channels
+        self.add_item(type_btn)
+
         back = discord.ui.Button(label="\u2190 Back", style=discord.ButtonStyle.grey, row=2)
         back.callback = self._go_back
         self.add_item(back)
@@ -1422,7 +1492,8 @@ class _ChannelAddSelectView(discord.ui.View):
             title="Add Allowed Channels",
             description=(
                 "Select one or more channels the casino should be restricted to.\n"
-                "Players will only be able to use the club in these channels."
+                "Players will only be able to use the club in these channels.\n\n"
+                "Can't find a channel? Press **\u2328\ufe0f Type Channels** and enter #mentions, IDs or names."
             ),
             color=PALETTE_GOLD,
         )
@@ -1450,6 +1521,17 @@ class _ChannelAddSelectView(discord.ui.View):
                 self.state.allowed_channels.append(cid)
         self._add_components()
         await interaction.response.edit_message(embed=self._build_embed(), view=self)
+
+    async def _type_channels(self, interaction: discord.Interaction) -> None:
+        modal = _ChannelEntryModal("Add Allowed Channels", multiple=True)
+        await interaction.response.send_modal(modal)
+        if await modal.wait() or modal.channels is None:
+            return
+        for channel in modal.channels:
+            if channel.id not in self.state.allowed_channels:
+                self.state.allowed_channels.append(channel.id)
+        self._add_components()
+        await safe_edit_original_response(interaction, embed=self._build_embed(), view=self)
 
     async def _previous_page(self, interaction: discord.Interaction) -> None:
         self._page_index = max(0, self._page_index - 1)
@@ -1581,6 +1663,9 @@ class _Page13HorseRacing(_WizardPageBase):
         select.callback = self._on_channel
         self.add_item(select)
 
+        type_btn = discord.ui.Button(label="⌨️ Type Channel", style=discord.ButtonStyle.blurple, row=1)
+        type_btn.callback = self._type_channel
+        self.add_item(type_btn)
         clear = discord.ui.Button(label="Clear Race Channel", style=discord.ButtonStyle.red, row=1,
                                   disabled=self.state.race_channel_id is None)
         clear.callback = self._clear_channel
@@ -1620,6 +1705,15 @@ class _Page13HorseRacing(_WizardPageBase):
         self.state.race_channel_id = int(interaction.data["values"][0])  # type: ignore[index]
         self._add_buttons()
         await self._render(interaction)
+
+    async def _type_channel(self, interaction: discord.Interaction) -> None:
+        modal = _ChannelEntryModal("Race Channel", multiple=False)
+        await interaction.response.send_modal(modal)
+        if await modal.wait() or modal.channels is None:
+            return
+        self.state.race_channel_id = modal.channels[0].id
+        self._add_buttons()
+        await safe_edit_original_response(interaction, embed=self._build_embed(), view=self)
 
     async def _clear_channel(self, interaction: discord.Interaction) -> None:
         self.state.race_channel_id = None
