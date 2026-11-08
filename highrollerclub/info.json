@@ -1,0 +1,37 @@
+{
+  "author": [
+    "Jayar/Vainne"
+  ],
+  "description": "A Vegas-style casino with 14 button-driven games (Blackjack, Roulette, Slots, Poker, multiplayer Horse Racing and more), ranks, prestige, specialty titles, Scratch Cards and bonus wheels. Plays with house chips or your server's bank.",
+  "disabled": false,
+  "end_user_data_statement": "This cog stores per-server game data for players: chip balance, rank, prestige, titles, game statistics and bonus timers, keyed by Discord user ID. It does not store message content. Users can have this data removed with Red's data deletion commands.",
+  "hidden": false,
+  "install_msg": "Thanks for installing The High Roller Club! An admin should run `[p]highrollerclubset setup` to choose the payment mode and open the games, then players can enter with `[p]highrollerclub`.",
+  "min_bot_version": "3.5.3",
+  "min_python_version": [
+    3,
+    10,
+    0
+  ],
+  "permissions": [
+    "send_messages",
+    "embed_links"
+  ],
+  "required_cogs": {},
+  "requirements": [
+    "pydantic"
+  ],
+  "short": "Vegas-style Casino Game",
+  "tags": [
+    "casino",
+    "games",
+    "economy",
+    "gambling",
+    "blackjack",
+    "poker",
+    "slots",
+    "roulette",
+    "horse racing"
+  ],
+  "type": "COG"
+}
