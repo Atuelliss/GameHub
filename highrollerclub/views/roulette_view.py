@@ -596,12 +596,17 @@ class RouletteView(discord.ui.View):
             name="Inside Bets",
             value=(
                 "```\n"
-                "Straight Up   35:1  Any single number 0-36\n"
-                "Split         17:1  Two adjacent numbers\n"
-                "Street        11:1  Three-number row\n"
-                "Corner         8:1  Four-number 2x2 block\n"
-                "Line           5:1  Six numbers (two rows)\n"
+                "Straight Up  35:1\n"
+                "Split        17:1\n"
+                "Street       11:1\n"
+                "Corner        8:1\n"
+                "Line          5:1\n"
                 "```"
+                "**Straight Up:** any single number 0-36\n"
+                "**Split:** two adjacent numbers\n"
+                "**Street:** a three-number row\n"
+                "**Corner:** a 2×2 block of four numbers\n"
+                "**Line:** six numbers (two rows)"
             ),
             inline=False,
         )

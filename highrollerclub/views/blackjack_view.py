@@ -86,12 +86,18 @@ from ..games.blackjack import (
     double_down_payout,
     draw_card,
     draw_hand,
-    hand_label,
     hand_value,
     is_blackjack,
     is_bust,
     win_payout,
 )
+
+
+
+def _cards(hand: list[Card]) -> str:
+    """Cards joined by single spaces, kept narrow for mobile code blocks."""
+    return " ".join(c.label for c in hand)
+
 
 # ---------------------------------------------------------------------------
 # Flavor text
@@ -469,12 +475,14 @@ class BlackjackView(discord.ui.View):
             name="Payouts",
             value=(
                 "```\n"
-                "Blackjack (natural)  3:2\n"
-                "Win                  1:1\n"
-                "Push                 Bet returned\n"
-                "Loss / Bust          Bet forfeited\n"
-                "Double Down Win      1:1 on doubled bet\n"
+                "Blackjack    3:2\n"
+                "Win          1:1\n"
+                "Double win   1:1\n"
+                "Push         Bet back\n"
+                "Loss / Bust  Bet lost\n"
                 "```"
+                "**Blackjack** is a natural 21 on your first two cards. "
+                "A **Double win** pays 1:1 on the doubled bet."
             ),
             inline=False,
         )
@@ -954,12 +962,12 @@ class BlackjackView(discord.ui.View):
 
             elif self._phase in ("active",):
                 p_val    = hand_value(self._player_hand)
-                p_label  = hand_label(self._player_hand)
-                d_show   = f"{self._dealer_hand[0].label}  [?]"
                 desc = (
                     f"```\n"
-                    f"  Dealer: {d_show}\n"
-                    f"  You   : {p_label}  (total: {p_val})\n"
+                    f"Dealer: ?\n"
+                    f"{self._dealer_hand[0].label} [?]\n"
+                    f"You: {p_val}\n"
+                    f"{_cards(self._player_hand)}\n"
                     f"```"
                     f"\nBet: **{self._bet:,}** {cur} — choose your action."
                 )
@@ -968,29 +976,29 @@ class BlackjackView(discord.ui.View):
 
             elif self._phase == "split_h1":
                 h1_val   = hand_value(self._split_hand1)
-                h1_label = hand_label(self._split_hand1)
-                h2_label = hand_label(self._split_hand2)
-                d_show   = f"{self._dealer_hand[0].label}  [?]"
                 desc = (
                     f"```\n"
-                    f"  Dealer  : {d_show}\n"
-                    f"  Hand 1▶ : {h1_label}  (total: {h1_val})  ← Playing now\n"
-                    f"  Hand 2  : {h2_label}\n"
+                    f"Dealer: ?\n"
+                    f"{self._dealer_hand[0].label} [?]\n"
+                    f"▶ Hand 1: {h1_val}\n"
+                    f"{_cards(self._split_hand1)}\n"
+                    f"  Hand 2\n"
+                    f"{_cards(self._split_hand2)}\n"
                     f"```"
                     f"\nEach hand bet: **{self._bet:,}** {cur}"
                 )
 
             elif self._phase == "split_h2":
                 h1_val   = hand_value(self._split_hand1)
-                h1_label = hand_label(self._split_hand1)
                 h2_val   = hand_value(self._split_hand2)
-                h2_label = hand_label(self._split_hand2)
-                d_show   = f"{self._dealer_hand[0].label}  [?]"
                 desc = (
                     f"```\n"
-                    f"  Dealer  : {d_show}\n"
-                    f"  Hand 1  : {h1_label}  (total: {h1_val})\n"
-                    f"  Hand 2▶ : {h2_label}  (total: {h2_val})  ← Playing now\n"
+                    f"Dealer: ?\n"
+                    f"{self._dealer_hand[0].label} [?]\n"
+                    f"  Hand 1: {h1_val}\n"
+                    f"{_cards(self._split_hand1)}\n"
+                    f"▶ Hand 2: {h2_val}\n"
+                    f"{_cards(self._split_hand2)}\n"
                     f"```"
                     f"\nEach hand bet: **{self._bet:,}** {cur}"
                 )
@@ -1004,19 +1012,18 @@ class BlackjackView(discord.ui.View):
             total_credit  = result["total_credit"]
             d_val         = result["dealer_val"]
             dealer_bj     = result["dealer_bj"]
-            d_label       = hand_label(result["dealer_hand"])
             d_bust        = is_bust(result["dealer_hand"])
 
             dealer_line = (
-                f"  Dealer: {d_label}  "
-                f"({'BJ!' if dealer_bj else 'bust!' if d_bust else str(d_val)})"
+                f"Dealer: {'BJ!' if dealer_bj else 'bust!' if d_bust else str(d_val)}\n"
+                f"{_cards(result['dealer_hand'])}"
             )
 
             if outcome == "split":
                 split_results = result["split_results"]
                 lines = [dealer_line]
+                hand_notes = []
                 for i, sr in enumerate(split_results, 1):
-                    h_label  = hand_label(sr["hand"])
                     h_val    = sr["hand_value"]
                     h_out    = sr["outcome"]
                     h_credit = sr["credit"]
@@ -1031,10 +1038,9 @@ class BlackjackView(discord.ui.View):
                         else " → lost"
                     )
                     label = "bust!" if h_out == "bust" else str(h_val)
-                    lines.append(
-                        f"  {icon} Hand {i}: {h_label}  ({label}){extra}"
-                    )
-                card_block = "```\n" + "\n".join(lines) + "\n```"
+                    lines.append(f"Hand {i}: {label}\n{_cards(sr['hand'])}")
+                    hand_notes.append(f"{icon} Hand {i}{extra}")
+                card_block = "```\n" + "\n".join(lines) + "\n```\n" + "\n".join(hand_notes)
 
                 net = total_credit - effective_bet
                 net_str = f"+{net:,}" if net >= 0 else str(net)
@@ -1046,13 +1052,12 @@ class BlackjackView(discord.ui.View):
                     desc += f"\n*{random.choice(_LOSS_FLAVOR)}*"
 
             else:
-                p_label = hand_label(result["player_hand"])
                 p_val   = result["player_val"]
                 p_bust  = is_bust(result["player_hand"])
                 p_bj    = is_blackjack(result["player_hand"])
                 player_line = (
-                    f"  You   : {p_label}  "
-                    f"({'BJ!' if p_bj else 'bust!' if p_bust else str(p_val)})"
+                    f"You: {'BJ!' if p_bj else 'bust!' if p_bust else str(p_val)}\n"
+                    f"{_cards(result['player_hand'])}"
                 )
                 card_block = f"```\n{player_line}\n{dealer_line}\n```"
 

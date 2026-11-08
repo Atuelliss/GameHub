@@ -58,6 +58,18 @@ _GAME_DISPLAY: dict[str, str] = {
     "horserace": "Horse Racing",
 }
 
+# Shorter names for the Stats screen's Game Breakdown table (mobile width).
+_STATS_SHORT_NAMES: dict[str, str] = {
+    "videopoker": "Vid Poker",
+    "clubpoker": "Club Poker",
+    "holdem": "Hold'em",
+    "big6": "Big Six",
+    "mysteryspin": "Mystery",
+    "multiplierwheel": "Mult Wheel",
+    "scratch": "Scratch",
+    "horserace": "Racing",
+}
+
 _GAME_EMOJI: dict[str, str] = {
     "slots": "🎰",
     "war": "⚔️",
@@ -950,19 +962,20 @@ class StatsView(_NavViewBase):
         }
         if played:
             # Sort alphabetically by display name.
+            # Short names and narrow columns keep the table readable on mobile.
             rows = sorted(played.keys(), key=lambda s: _GAME_DISPLAY.get(s, s))
-            col_w = max(len(_GAME_DISPLAY.get(s, s)) for s in rows)
+            short = {s: _STATS_SHORT_NAMES.get(s, _GAME_DISPLAY.get(s, s)) for s in rows}
+            col_w = max(len(name) for name in short.values())
             col_w = max(col_w, 4)  # at least as wide as "Game"
-            header = f"{'Game':<{col_w}}   {'W':>5}  {'L':>5}  {'Win%':>6}"
-            divider = "─" * len(header)
+            header = f"{'Game':<{col_w}}  {'W':>3} {'L':>3} {'Win%':>4}"
+            divider = "-" * len(header)
             lines = [header, divider]
             for slug in rows:
-                display = _GAME_DISPLAY.get(slug, slug)
                 w = user.game_win_counts.get(slug, 0)
                 l = user.game_loss_counts.get(slug, 0)
                 total_g = w + l
-                pct = f"{w / total_g * 100:.1f}%" if total_g > 0 else "—"
-                lines.append(f"{display:<{col_w}}   {w:>5}  {l:>5}  {pct:>6}")
+                pct = f"{w / total_g * 100:.0f}%" if total_g > 0 else "-"
+                lines.append(f"{short[slug]:<{col_w}}  {w:>3} {l:>3} {pct:>4}")
             e.add_field(name="Game Breakdown", value=f"```\n{chr(10).join(lines)}\n```", inline=False)
 
         if url := embed_image("stats"):

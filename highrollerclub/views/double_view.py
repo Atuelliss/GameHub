@@ -582,13 +582,14 @@ class DoubleView(discord.ui.View):
             name="Pot Growth (example: 200 chip bet)",
             value=(
                 "```\n"
-                "Roll 1 win  :   400\n"
-                "Roll 2 win  :   800\n"
-                "Roll 3 win  : 1,600\n"
-                "Roll 4 win  : 3,200\n"
-                "Roll 5 win  : 6,400\n"
-                "Any loss    :     0  (entire bet forfeited)\n"
+                "Roll 1 win :   400\n"
+                "Roll 2 win :   800\n"
+                "Roll 3 win : 1,600\n"
+                "Roll 4 win : 3,200\n"
+                "Roll 5 win : 6,400\n"
+                "Any loss   :     0\n"
                 "```"
+                "Any loss forfeits the entire bet."
             ),
             inline=False,
         )

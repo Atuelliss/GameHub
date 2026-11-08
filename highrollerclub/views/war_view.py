@@ -322,10 +322,13 @@ class WarView(discord.ui.View):
             name="Outcomes",
             value=(
                 "```\n"
-                "Win    Higher card → 1:1 payout (2× your bet returned)\n"
-                "Lose   Lower card  → Bet is lost\n"
-                "Tie    Equal ranks → War! (automatic, see below)\n"
+                "Win   1:1\n"
+                "Lose  Bet lost\n"
+                "Tie   War!\n"
                 "```"
+                "**Win:** your card is higher. Pays 1:1 (2× your bet returned).\n"
+                "**Lose:** your card is lower. Your bet is lost.\n"
+                "**Tie:** equal ranks start a War round automatically (see below)."
             ),
             inline=False,
         )

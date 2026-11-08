@@ -336,18 +336,19 @@ class SlotsView(discord.ui.View):
         if result is None:
             # --- Idle / ready state ---
             reel_art = build_idle_display()
-            desc = f"```\n{reel_art}\n```\n**Place your bet and hit Spin!**"
+            desc = "**Place your bet and hit Spin!**"
+            details = ""
 
             if user.free_spins_available > 0:
-                desc += (
+                details += (
                     f"\n🎟️ You have **{user.free_spins_available}** free spin(s) — "
                     "your next spin is on the house!"
                 )
             mul = get_pending_multiplier(user)
             if mul is not None:
-                desc += f"\n⚡ Bonus snapshot: **{mul}×** multiplier if it is still active on your next win."
+                details += f"\n⚡ Bonus snapshot: **{mul}×** multiplier if it is still active on your next win."
             if has_bonus_bet_token(user):
-                desc += "\n🎫 Bonus snapshot: Bonus Bet Token doubles your winnings if it is still unused when a win resolves."
+                details += "\n🎫 Bonus snapshot: Bonus Bet Token doubles your winnings if it is still unused when a win resolves."
         else:
             # --- Result state ---
             grid = result["grid"]
@@ -359,38 +360,42 @@ class SlotsView(discord.ui.View):
 
             reel_art = build_reel_display(grid)
             cur = self._cached_currency
-            desc = f"```\n{reel_art}\n```"
+            details = ""
 
             if is_win:
                 free_note = " *(free spin!)*" if using_free_spin else ""
-                desc += f"\n✅ **{outcome_label}**"
-                desc += (
+                desc = f"✅ **{outcome_label}**"
+                details += (
                     f"\nBet: **{bet:,}** {cur}{free_note} "
                     f"→ Payout: **{payout:,}** {cur}"
                 )
-                desc += f"\n*{random.choice(_WIN_FLAVOR)}*"
+                details += f"\n*{random.choice(_WIN_FLAVOR)}*"
             else:
                 free_note = " *(free spin used)*" if using_free_spin else ""
-                desc += f"\n❌ **{outcome_label}**"
-                desc += f"\nBet: **{bet:,}** {cur}{free_note}"
-                desc += f"\n*{random.choice(_LOSS_FLAVOR)}*"
+                desc = f"❌ **{outcome_label}**"
+                details += f"\nBet: **{bet:,}** {cur}{free_note}"
+                details += f"\n*{random.choice(_LOSS_FLAVOR)}*"
 
             if result.get("streak_cancelled"):
-                desc += "\n💔 **Your lucky streak has ended.**"
+                details += "\n💔 **Your lucky streak has ended.**"
 
             if result.get("rank_changed"):
                 old_name = RANK_NAMES.get(result["old_rank"], "Unknown")
                 new_name = RANK_NAMES.get(result["new_rank"], "Unknown")
                 if result["new_rank"] > result["old_rank"]:
-                    desc += f"\n🏆 **Rank Up!** You are now a **{new_name}**!"
+                    details += f"\n🏆 **Rank Up!** You are now a **{new_name}**!"
                 else:
-                    desc += f"\n📉 **Rank Down.** **{old_name}** → **{new_name}**."
+                    details += f"\n📉 **Rank Down.** **{old_name}** → **{new_name}**."
 
             for slug in result.get("new_titles", []):
                 title_str = SPECIALTY_TITLES.get(slug, slug)
-                desc += f"\n🎖️ **New title unlocked:** {title_str}"
+                details += f"\n🎖️ **New title unlocked:** {title_str}"
 
+        # The description sits beside the thumbnail on mobile, which squeezes
+        # code blocks. The reels go in a field below it so they get the full
+        # embed width.
         e.description = desc
+        e.add_field(name="Reels", value=f"```\n{reel_art}\n```{details}", inline=False)
 
         # Thumbnail (activated once the asset is uploaded)
         if url := embed_image("slots"):
