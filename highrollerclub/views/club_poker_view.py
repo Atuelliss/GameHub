@@ -4,8 +4,15 @@ Flow
 ----
 1. Challenger posts a public challenge for one opponent and ante amount.
 2. Opponent accepts publicly; both antes are deducted.
-3. Both players privately view 5-card hands via ephemeral controls.
+3. Both players privately view 5-card hands via ephemeral controls. Each
+   player's private panel is edited in place as the hand moves on (like
+   Texas Hold'em), and every action is taken from that panel.
 4. Each player privately selects holds and locks in their draw.
+   Both private panels are sent automatically when the challenge is accepted.
+   Every decision has a 90 second clock (ACTION_SECONDS). Missing the draw
+   clock, or a Call/Fold decision, folds your hand; missing a turn with no
+   bet open Stays (checks) for you. If neither player locks their draw in
+   time, the hand is cancelled and both antes are refunded.
 5. Once both lock, redraws are applied from a shared deck in fixed order:
    challenger first, challenged second.
 6. One fixed betting round follows:
@@ -21,8 +28,10 @@ Flow
 from __future__ import annotations
 
 import asyncio
+import logging
 import random
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 
 import discord
 from redbot.core import bank
@@ -49,6 +58,11 @@ from ..commands.helper_functions import (
     validate_bet,
 )
 from ..games.poker import CP_HAND_NAMES, Card, Deck, compare_cp_showdown, evaluate_cp_hand
+
+log = logging.getLogger("red.highrollerclub.clubpoker")
+
+# Seconds a player has to make each decision before the game acts for them.
+ACTION_SECONDS = 90
 
 
 _CP_WIN_FLAVOR: dict[str, str] = {
@@ -118,6 +132,18 @@ class _ClubPokerSession:
         self.loser_user_id: int | None = None
         self._muck_task: asyncio.Task | None = None
         self._resolved = False
+        # Each player's open private panel, edited in place whenever the hand changes.
+        # An interaction (the player pressed a button on it) or a followup message (sent on accept).
+        self.panels: dict[int, discord.Interaction | discord.WebhookMessage] = {}
+        # Action clock. turn_token goes up whenever the clock restarts or stops,
+        # so a timer that fires late can tell it is stale.
+        self.turn_token = 0
+        self.turn_deadline: datetime | None = None
+        self._turn_task: asyncio.Task | None = None
+        self.timed_out_user_id: int | None = None
+        # Players who ran out of time with no bet open and were Stayed for automatically.
+        self.auto_stayed: list[int] = []
+        self.refresh_count = 0  # bumped on every full redraw, so callers know panels are fresh
 
         self.challenger.hand = self.deck.deal(5)
         self.challenged.hand = self.deck.deal(5)
@@ -163,18 +189,37 @@ class _ClubPokerSession:
     def replacement_count_for(self, user_id: int) -> int:
         return self.player_for(user_id).cards_replaced
 
+    def deadline_text(self) -> str:
+        """Relative Discord timestamp for the current action clock, e.g. 'in 1 minute'."""
+        if self.turn_deadline is None:
+            return f"within {ACTION_SECONDS} seconds"
+        return f"<t:{int(self.turn_deadline.timestamp())}:R>"
+
+    def timeout_penalty(self) -> str:
+        """What happens to the player on the clock if they don't act in time."""
+        if self.phase == "betting" and not self.bet_open:
+            return "you **Stay** (check) automatically"
+        return "your hand is **folded**"
+
     def _status_line(self) -> str:
         if self.phase == "draw":
             return (
                 f"{self.challenger.member.mention}: {'locked' if self.challenger.draw_locked else 'choosing cards'}\n"
-                f"{self.challenged.member.mention}: {'locked' if self.challenged.draw_locked else 'choosing cards'}"
+                f"{self.challenged.member.mention}: {'locked' if self.challenged.draw_locked else 'choosing cards'}\n"
+                f"⏰ Draws must be locked {self.deadline_text()} or that hand is folded."
             )
         if self.phase == "betting":
             actor = self.player_for(self.turn_user_id).member.mention
+            if self.bet_open:
+                clock = f"\n⏰ {actor} must act {self.deadline_text()} or their hand is folded."
+            else:
+                clock = f"\n⏰ {actor} must act {self.deadline_text()} or they Stay automatically."
+            for uid in self.auto_stayed:
+                clock = f"\n⏰ {self.player_for(uid).member.mention} ran out of time and Stayed automatically." + clock
             if self.bet_open and self.bettor_id is not None:
                 bettor = self.player_for(self.bettor_id).member.mention
-                return f"Betting round: {bettor} opened betting for **{self.ante:,} {self.currency}**. Waiting on {actor}."
-            return f"Betting round: it is {actor}'s turn."
+                return f"Betting round: {bettor} opened betting for **{self.ante:,} {self.currency}**. Waiting on {actor}.{clock}"
+            return f"Betting round: it is {actor}'s turn.{clock}"
         if self.phase == "muck_choice":
             if self.loser_user_id is None:
                 return "The losing player has 15 seconds to show or muck their hand."
@@ -191,8 +236,22 @@ class _ClubPokerSession:
                 f"**Players:** {self.challenger.member.mention} vs {self.challenged.member.mention}\n"
                 f"**Ante:** {self.ante:,} {self.currency} each\n"
                 f"**Pot:** {self.total_pot():,} {self.currency}\n\n"
-                "Both players must open their private hand, choose holds, and lock in their draw.\n\n"
+                "Your private hand has been sent to each player. Every decision is made there, "
+                f"and you have **{ACTION_SECONDS} seconds** for each one. Lost your hand? Press **Reopen My Hand**.\n\n"
                 f"{self._status_line()}"
+            )
+            if url := embed_image("clubpoker"):
+                embed.set_thumbnail(url=url)
+            return embed
+
+        if self.result["outcome"] == "cancelled":
+            embed = discord.Embed(
+                title="🃏 Club Poker -- Cancelled",
+                color=discord.Color.red(),
+                description=(
+                    f"{self.result.get('reason') or 'The hand was cancelled.'}\n"
+                    "Every committed bet was refunded. No money changed hands."
+                ),
             )
             if url := embed_image("clubpoker"):
                 embed.set_thumbnail(url=url)
@@ -241,7 +300,10 @@ class _ClubPokerSession:
             assert winner is not None
             lines.append(f"🏆 **{winner.mention} wins by fold.**")
             if fold_user is not None:
-                lines.append(f"{fold_user.mention} folded during the betting round.")
+                if self.timed_out_user_id == fold_user.id:
+                    lines.append(f"⏰ {fold_user.mention} ran out of time and their hand was folded.")
+                else:
+                    lines.append(f"{fold_user.mention} folded during the betting round.")
             lines.append(
                 f"Pot: **{self.total_pot():,}** {self.currency} → Payout: **{total_payout:,}** {self.currency} *(+{net_profit:,} profit)*"
             )
@@ -270,13 +332,84 @@ class _ClubPokerSession:
         if self.public_message is None or self.public_view is None:
             return
         self.public_view.sync_items()
-        await self.public_message.edit(embed=self.build_public_embed(), view=self.public_view)
+        try:
+            await self.public_message.edit(embed=self.build_public_embed(), view=self.public_view)
+        except discord.HTTPException:
+            log.warning("Club Poker: couldn't update the public message")
+
+    async def refresh_panels(self) -> None:
+        """Redraw every open private panel. A panel Discord won't edit any more is forgotten."""
+        if not self.panels:
+            return
+
+        async def redraw(uid: int, panel: discord.Interaction | discord.WebhookMessage) -> None:
+            view = ClubPokerPrivateView(self, uid)
+            try:
+                if isinstance(panel, discord.Interaction):
+                    await panel.edit_original_response(embed=view.build_embed(), view=view)
+                else:
+                    await panel.edit(embed=view.build_embed(), view=view)
+            except (discord.HTTPException, discord.NotFound):
+                if self.panels.get(uid) is panel:
+                    self.panels.pop(uid, None)
+
+        await asyncio.gather(*(redraw(uid, i) for uid, i in list(self.panels.items())), return_exceptions=True)
+
+    async def refresh(self) -> None:
+        self.refresh_count += 1
+        await self.refresh_public()
+        await self.refresh_panels()
+
+    # -- action clock --------------------------------------------------------
+
+    def start_turn_timer(self) -> None:
+        """Restart the action clock for whoever has to act now."""
+        self.stop_turn_timer()
+        self.turn_deadline = datetime.now(timezone.utc) + timedelta(seconds=ACTION_SECONDS)
+        self._turn_task = asyncio.create_task(self._turn_timer(self.turn_token))
+
+    def stop_turn_timer(self) -> None:
+        self.turn_token += 1
+        self.turn_deadline = None
+        if self._turn_task is not None and self._turn_task is not asyncio.current_task():
+            self._turn_task.cancel()
+        self._turn_task = None
+
+    async def _turn_timer(self, token: int) -> None:
+        try:
+            await asyncio.sleep(ACTION_SECONDS)
+            async with self.lock:
+                await self._on_turn_timeout(token)
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            log.exception("Club Poker: action timer failed")
+
+    async def _on_turn_timeout(self, token: int) -> None:
+        """The clock ran out: Stay if no bet is open, otherwise fold. (Caller holds self.lock.)"""
+        if token != self.turn_token or self._resolved:
+            return
+        if self.phase == "draw":
+            late = [p for p in self.all_players() if not p.draw_locked]
+            if len(late) == 2:
+                await self.cancel_and_refund("Neither player locked their draw in time.")
+            elif len(late) == 1:
+                self.timed_out_user_id = late[0].member.id
+                await self.resolve_hand(fold_user_id=late[0].member.id)
+        elif self.phase == "betting" and self.turn_user_id is not None:
+            if self.bet_open:
+                self.timed_out_user_id = self.turn_user_id
+                await self.resolve_hand(fold_user_id=self.turn_user_id)
+            else:
+                self.auto_stayed.append(self.turn_user_id)
+                await self.take_check(self.turn_user_id)
 
     async def cancel_and_refund(self, reason: str) -> None:
         if self._resolved:
             return
         if self.phase != "draw" and self.phase != "betting":
             return
+        self.stop_turn_timer()
         self._resolved = True
         self.phase = "cancelled"
         await credit_balance(self.challenger.member, self.conf, self.challenger.user, self.committed_total_for(self.challenger))
@@ -291,13 +424,13 @@ class _ClubPokerSession:
             "reason": reason,
         }
         self.cog.save()
-        await self.refresh_public()
+        await self.refresh()
 
     async def lock_draw(self, user_id: int) -> None:
         player = self.player_for(user_id)
         player.draw_locked = True
         if not all(p.draw_locked for p in self.all_players()):
-            await self.refresh_public()
+            await self.refresh()
             return
 
         for p in (self.challenger, self.challenged):
@@ -312,7 +445,8 @@ class _ClubPokerSession:
         self.bet_open = False
         self.bettor_id = None
         self.first_check_complete = False
-        await self.refresh_public()
+        self.start_turn_timer()
+        await self.refresh()
 
     async def take_check(self, user_id: int) -> None:
         if self.phase != "betting" or self.bet_open or self.turn_user_id != user_id:
@@ -320,7 +454,8 @@ class _ClubPokerSession:
         if user_id == self.challenger.member.id and not self.first_check_complete:
             self.first_check_complete = True
             self.turn_user_id = self.challenged.member.id
-            await self.refresh_public()
+            self.start_turn_timer()
+            await self.refresh()
             return
         await self.resolve_hand()
 
@@ -335,7 +470,8 @@ class _ClubPokerSession:
         self.bet_open = True
         self.bettor_id = user_id
         self.turn_user_id = self.other_player(user_id).member.id
-        await self.refresh_public()
+        self.start_turn_timer()
+        await self.refresh()
         return None
 
     async def call_bet(self, user_id: int) -> str | None:
@@ -357,6 +493,7 @@ class _ClubPokerSession:
     async def resolve_hand(self, fold_user_id: int | None = None) -> None:
         if self._resolved:
             return
+        self.stop_turn_timer()
 
         challenger_rank = evaluate_cp_hand(self.challenger.hand)
         challenged_rank = evaluate_cp_hand(self.challenged.hand)
@@ -433,7 +570,7 @@ class _ClubPokerSession:
             if self._muck_task is not None:
                 self._muck_task.cancel()
             self._muck_task = asyncio.create_task(self._auto_muck())
-        await self.refresh_public()
+        await self.refresh()
 
     async def _auto_muck(self) -> None:
         try:
@@ -444,7 +581,7 @@ class _ClubPokerSession:
             if self.phase == "muck_choice" and self.loser_visibility is None:
                 self.loser_visibility = "muck"
                 self.phase = "resolved"
-                await self.refresh_public()
+                await self.refresh()
 
     async def set_loser_visibility(self, visibility: str) -> None:
         if self.phase != "muck_choice" or self.loser_visibility is not None:
@@ -454,7 +591,7 @@ class _ClubPokerSession:
         if self._muck_task is not None:
             self._muck_task.cancel()
             self._muck_task = None
-        await self.refresh_public()
+        await self.refresh()
 
 
 class ClubPokerChallengeModal(discord.ui.Modal, title="Club Poker: Challenge a Player"):
@@ -562,6 +699,10 @@ class ClubPokerView(discord.ui.View):
             "4. After both lock in, replacement cards are drawn from the same deck.\n"
             "5. One betting round follows: Stay or Bet, then Call or Fold. No raises.\n"
             "6. If neither player folds, the best 5-card hand wins.\n\n"
+            "Your private hand is sent to you as soon as the challenge is accepted. It updates itself and tells you when the game is waiting on you. "
+            f"You get **{ACTION_SECONDS} seconds** for each decision. **If you don't act in time, your hand is folded**, "
+            "except when no bet is open: then you Stay automatically. "
+            "If neither player locks their draw in time, the hand is cancelled and both antes are refunded.\n\n"
             "The winning hand is always shown publicly. The losing player gets 15 seconds to show or muck their hand.\n\n"
             "No bonuses apply: no Lucky Streak, Bonus Bet Token or Multiplier Wheel. Every chip in the pot comes from the two players."
         )
@@ -677,6 +818,7 @@ class ClubPokerView(discord.ui.View):
             cog=self._cog,
             ante=bet,
             currency=self._cached_currency or "chips",
+            challenger_interaction=interaction,
         )
         challenge_message = await interaction.followup.send(embed=challenge_embed, view=challenge_view, wait=True)
         challenge_view._message = challenge_message
@@ -726,8 +868,12 @@ class ClubPokerChallengeView(discord.ui.View):
         cog: MixinMeta,
         ante: int,
         currency: str,
+        challenger_interaction: discord.Interaction,
     ) -> None:
         super().__init__(timeout=300)
+        # The challenger's own interaction (their challenge form). Only it can send them a
+        # private message, so it's how their hand is delivered when the challenge is accepted.
+        self._challenger_interaction = challenger_interaction
         self._challenger = challenger
         self._challenger_user = challenger_user
         self._challenged = challenged
@@ -814,7 +960,23 @@ class ClubPokerChallengeView(discord.ui.View):
         session.public_message = interaction.message
         session_view = ClubPokerSessionView(session)
         session.public_view = session_view
+        session.start_turn_timer()  # the draw clock
         await safe_edit_original_response(interaction, embed=session.build_public_embed(), view=session_view)
+
+        # Deliver both private hands straight away, so nobody has to press a button to start.
+        async def send_hand(user_id: int, via: discord.Interaction) -> None:
+            view = ClubPokerPrivateView(session, user_id)
+            try:
+                message = await via.followup.send(embed=view.build_embed(), view=view, ephemeral=True, wait=True)
+            except discord.HTTPException:
+                log.warning("Club Poker: couldn't deliver the private hand to %s", user_id)
+                return
+            session.panels.setdefault(user_id, message)
+
+        await asyncio.gather(
+            send_hand(self._challenger.id, self._challenger_interaction),
+            send_hand(self._challenged.id, interaction),
+        )
 
     async def _on_decline(self, interaction: discord.Interaction) -> None:
         if self._resolved:
@@ -844,14 +1006,10 @@ class ClubPokerSessionView(discord.ui.View):
 
     def sync_items(self) -> None:
         self.clear_items()
+        # Both hands are sent automatically on accept. This is only a fallback for a player
+        # who dismissed theirs, or whose hand couldn't be delivered.
         if self._session.phase in {"draw", "betting", "muck_choice"}:
-            if self._session.phase == "draw":
-                label = "🂠 Draw Private Hand"
-            elif self._session.phase == "betting":
-                label = "➡️ Move to Next Round"
-            else:
-                label = "🂠 Review Private Hand"
-            open_btn = discord.ui.Button(label=label, style=discord.ButtonStyle.blurple, row=0)
+            open_btn = discord.ui.Button(label="🂠 Reopen My Hand", style=discord.ButtonStyle.grey, row=0)
             open_btn.callback = self._open_private
             self.add_item(open_btn)
 
@@ -861,6 +1019,7 @@ class ClubPokerSessionView(discord.ui.View):
             return
         view = ClubPokerPrivateView(self._session, interaction.user.id)
         await interaction.response.send_message(embed=view.build_embed(), view=view, ephemeral=True)
+        self._session.panels[interaction.user.id] = interaction
 
     async def on_timeout(self) -> None:
         async with self._session.lock:
@@ -878,7 +1037,7 @@ class ClubPokerSessionView(discord.ui.View):
 
 class ClubPokerPrivateView(discord.ui.View):
     def __init__(self, session: _ClubPokerSession, user_id: int) -> None:
-        super().__init__(timeout=180)
+        super().__init__(timeout=900)  # Discord lets an ephemeral reply be edited for 15 minutes
         self._session = session
         self._user_id = user_id
         self.sync_items()
@@ -903,23 +1062,23 @@ class ClubPokerPrivateView(discord.ui.View):
                 self.add_item(button)
 
             lock_btn = discord.ui.Button(label="🔒 Lock Draw", style=discord.ButtonStyle.blurple, row=1)
-            lock_btn.callback = self._lock_draw
+            lock_btn.callback = self._lock_draw()
             self.add_item(lock_btn)
 
         elif self._session.phase == "betting" and self._session.turn_user_id == self._user_id:
             if self._session.bet_open:
                 call_btn = discord.ui.Button(label=f"📞 Call ({self._session.ante:,})", style=discord.ButtonStyle.green, row=0)
-                call_btn.callback = self._call_bet
+                call_btn.callback = self._call_bet()
                 self.add_item(call_btn)
                 fold_btn = discord.ui.Button(label="🚪 Fold", style=discord.ButtonStyle.red, row=0)
-                fold_btn.callback = self._fold_hand
+                fold_btn.callback = self._fold_hand()
                 self.add_item(fold_btn)
             else:
                 stay_btn = discord.ui.Button(label="✋ Stay", style=discord.ButtonStyle.grey, row=0)
-                stay_btn.callback = self._take_check
+                stay_btn.callback = self._take_check()
                 self.add_item(stay_btn)
                 bet_btn = discord.ui.Button(label=f"💰 Bet ({self._session.ante:,})", style=discord.ButtonStyle.green, row=0)
-                bet_btn.callback = self._open_bet
+                bet_btn.callback = self._open_bet()
                 self.add_item(bet_btn)
 
         elif (
@@ -928,10 +1087,10 @@ class ClubPokerPrivateView(discord.ui.View):
             and self._session.loser_visibility is None
         ):
             show_btn = discord.ui.Button(label="🪞 Show Hand", style=discord.ButtonStyle.green, row=0)
-            show_btn.callback = self._show_hand
+            show_btn.callback = self._show_hand()
             self.add_item(show_btn)
             muck_btn = discord.ui.Button(label="🂠 Muck Hand", style=discord.ButtonStyle.grey, row=0)
-            muck_btn.callback = self._muck_hand
+            muck_btn.callback = self._muck_hand()
             self.add_item(muck_btn)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -943,104 +1102,154 @@ class ClubPokerPrivateView(discord.ui.View):
     async def on_timeout(self) -> None:
         self.clear_items()
 
+    def _is_my_move(self) -> bool:
+        """True when the hand is waiting on this player."""
+        session = self._session
+        if session.phase == "draw":
+            return not self._player().draw_locked
+        if session.phase == "betting":
+            return session.turn_user_id == self._user_id
+        return False
+
     def build_embed(self) -> discord.Embed:
+        session = self._session
         player = self._player()
-        embed = discord.Embed(title="🃏 Club Poker -- Private Hand", color=PALETTE_GOLD)
+        opponent = session.other_player(self._user_id)
+        my_move = self._is_my_move()
+        embed = discord.Embed(
+            title="🃏 Club Poker -- ⏰ YOUR MOVE" if my_move else "🃏 Club Poker -- Private Hand",
+            color=discord.Color.red() if my_move else PALETTE_GOLD,
+        )
         hand_text = "  ".join(
             f"**[{card.label}]**" if player.held[idx] else card.label
             for idx, card in enumerate(player.hand)
         )
-        embed.description = f"**Your hand:**\n{hand_text}\n\n"
+        lines = [f"**Your hand:**\n{hand_text}", f"**Pot:** {session.total_pot():,} {session.currency}", ""]
+        hurry = (
+            f"⏰ **The game is waiting on YOU. Hurry up and go!**\n"
+            f"You have **{ACTION_SECONDS} seconds** per decision. Time runs out {session.deadline_text()}, "
+            f"and if you don't act by then {session.timeout_penalty()}."
+        )
 
-        if self._session.phase == "draw":
+        if session.phase == "draw":
             if player.draw_locked:
-                embed.description += "🔒 Your draw is locked in. Waiting for the other player."
+                lines.append(f"🔒 Your draw is locked in. Waiting on {opponent.member.mention} to lock theirs.")
+                lines.append(f"They have until {session.deadline_text()} or their hand is folded.")
             else:
                 held_count = sum(player.held)
-                embed.description += (
-                    f"Select which cards to **hold**. Currently holding **{held_count}/5** card(s).\n"
-                    "When ready, click **Lock Draw**."
+                lines.append(hurry)
+                lines.append("")
+                lines.append(
+                    f"Tap cards to **hold** them. Holding **{held_count}/5** card(s). "
+                    "When ready, press **Lock Draw**."
                 )
-        elif self._session.phase == "betting":
-            replaced = self._session.replacement_count_for(self._user_id)
-            draw_text = f"You drew **{replaced}** new card(s) from the cards you did not keep.\n\n"
-            embed.description += draw_text
-            if self._session.turn_user_id == self._user_id:
-                if self._session.bet_open:
-                    bettor = self._session.player_for(self._session.bettor_id).member.mention
-                    embed.description += f"{bettor} opened betting for **{self._session.ante:,} {self._session.currency}**. Choose **Call** or **Fold**."
+                lines.append(
+                    f"{opponent.member.mention}: {'🔒 locked in' if opponent.draw_locked else 'still choosing'}"
+                )
+        elif session.phase == "betting":
+            if self._user_id in session.auto_stayed:
+                lines.append("⏰ You ran out of time, so you **Stayed** automatically.")
+            replaced = session.replacement_count_for(self._user_id)
+            lines.append(f"You drew **{replaced}** new card(s) from the cards you did not keep.")
+            lines.append(f"**Your hand now:** *{CP_HAND_NAMES[evaluate_cp_hand(player.hand)]}*")
+            lines.append("")
+            if my_move:
+                lines.append(hurry)
+                lines.append("")
+                if session.bet_open:
+                    bettor = session.player_for(session.bettor_id).member.mention
+                    lines.append(
+                        f"{bettor} opened betting for **{session.ante:,} {session.currency}**. "
+                        "Choose **Call** or **Fold**."
+                    )
                 else:
-                    embed.description += f"It's your turn. Choose **Stay** or open betting for **{self._session.ante:,} {self._session.currency}**."
+                    lines.append(
+                        f"Choose **Stay** or open betting for **{session.ante:,} {session.currency}**."
+                    )
             else:
-                actor = self._session.player_for(self._session.turn_user_id).member.mention
-                embed.description += f"Waiting on {actor} to act."
-        elif self._session.phase == "muck_choice":
-            if self._user_id == self._session.loser_user_id and self._session.loser_visibility is None:
-                embed.description += "You may **Show Hand** or **Muck Hand**. If you do nothing for 15 seconds, your hand is mucked."
-            else:
-                embed.description += "The hand has been resolved."
+                lines.append(f"⏳ Waiting on {opponent.member.mention} to act.")
+                if session.bet_open:
+                    lines.append(f"They have until {session.deadline_text()} or their hand is folded.")
+                else:
+                    lines.append(f"They have until {session.deadline_text()} or they Stay automatically.")
+        elif session.phase == "muck_choice":
+            lines.append(self._result_line())
+            if self._user_id == session.loser_user_id and session.loser_visibility is None:
+                lines.append("You may **Show Hand** or **Muck Hand**. If you do nothing for 15 seconds, your hand is mucked.")
+        elif session.phase == "cancelled":
+            reason = (session.result or {}).get("reason") or "The hand was cancelled."
+            lines.append(f"❌ {reason} Every committed bet was refunded.")
         else:
-            embed.description += "The hand has been resolved."
+            lines.append(self._result_line())
+            lines.append("The hand is over. See the table message for both hands.")
 
+        embed.description = "\n".join(lines)
         return embed
 
-    def _make_hold_callback(self, idx: int):
+    def _result_line(self) -> str:
+        result = self._session.result or {}
+        outcome = result.get("outcome")
+        if outcome == "tie":
+            return "🤝 **Tie.** Your committed bets were returned."
+        winner = result.get("winner")
+        if winner is not None and winner.id == self._user_id:
+            return f"🏆 **You won {result.get('total_payout', 0):,} {self._session.currency}** (+{result.get('net_profit', 0):,})."
+        if self._session.timed_out_user_id == self._user_id:
+            return "⏰ **You ran out of time and your hand was folded.**"
+        if outcome == "fold":
+            return "🚪 **You folded.** Your opponent takes the pot."
+        return "❌ **You lost at showdown.**"
+
+    def _run(self, action):
+        """Wrap a session action as a button callback.
+
+        The pressed panel becomes this player's live panel. Session actions redraw
+        every live panel themselves; if the action redrew nothing (a hold toggle,
+        a stale button) or failed, only this panel is redrawn."""
+
         async def callback(interaction: discord.Interaction) -> None:
-            async with self._session.lock:
-                if self._session.phase != "draw" or self._player().draw_locked:
-                    view = ClubPokerPrivateView(self._session, self._user_id)
-                    await interaction.response.edit_message(embed=view.build_embed(), view=view)
-                    return
-                self._player().held[idx] = not self._player().held[idx]
-                view = ClubPokerPrivateView(self._session, self._user_id)
-                await interaction.response.edit_message(embed=view.build_embed(), view=view)
+            await safe_defer(interaction)
+            session = self._session
+            session.panels[self._user_id] = interaction
+            async with session.lock:
+                before = session.refresh_count
+                error = await action()
+                if error:
+                    await interaction.followup.send(error, ephemeral=True)
+                if error or session.refresh_count == before:
+                    view = ClubPokerPrivateView(session, self._user_id)
+                    await safe_edit_original_response(interaction, embed=view.build_embed(), view=view)
 
         return callback
 
-    async def _lock_draw(self, interaction: discord.Interaction) -> None:
-        async with self._session.lock:
-            await self._session.lock_draw(self._user_id)
-            view = ClubPokerPrivateView(self._session, self._user_id)
-            await interaction.response.edit_message(embed=view.build_embed(), view=view)
+    def _make_hold_callback(self, idx: int):
+        async def toggle() -> None:
+            if self._session.phase == "draw" and not self._player().draw_locked:
+                self._player().held[idx] = not self._player().held[idx]
 
-    async def _take_check(self, interaction: discord.Interaction) -> None:
-        async with self._session.lock:
-            await self._session.take_check(self._user_id)
-            view = ClubPokerPrivateView(self._session, self._user_id)
-            await interaction.response.edit_message(embed=view.build_embed(), view=view)
+        return self._run(toggle)
 
-    async def _open_bet(self, interaction: discord.Interaction) -> None:
-        async with self._session.lock:
-            error = await self._session.open_bet(self._user_id)
-            if error:
-                await interaction.response.send_message(error, ephemeral=True)
-                return
-            view = ClubPokerPrivateView(self._session, self._user_id)
-            await interaction.response.edit_message(embed=view.build_embed(), view=view)
+    def _lock_draw(self):
+        async def act() -> None:
+            if self._session.phase == "draw" and not self._player().draw_locked:
+                await self._session.lock_draw(self._user_id)
 
-    async def _call_bet(self, interaction: discord.Interaction) -> None:
-        async with self._session.lock:
-            error = await self._session.call_bet(self._user_id)
-            if error:
-                await interaction.response.send_message(error, ephemeral=True)
-                return
-            view = ClubPokerPrivateView(self._session, self._user_id)
-            await interaction.response.edit_message(embed=view.build_embed(), view=view)
+        return self._run(act)
 
-    async def _fold_hand(self, interaction: discord.Interaction) -> None:
-        async with self._session.lock:
-            await self._session.fold_hand(self._user_id)
-            view = ClubPokerPrivateView(self._session, self._user_id)
-            await interaction.response.edit_message(embed=view.build_embed(), view=view)
+    def _take_check(self):
+        return self._run(lambda: self._session.take_check(self._user_id))
 
-    async def _show_hand(self, interaction: discord.Interaction) -> None:
-        async with self._session.lock:
-            await self._session.set_loser_visibility("show")
-            view = ClubPokerPrivateView(self._session, self._user_id)
-            await interaction.response.edit_message(embed=view.build_embed(), view=view)
+    def _open_bet(self):
+        return self._run(lambda: self._session.open_bet(self._user_id))
 
-    async def _muck_hand(self, interaction: discord.Interaction) -> None:
-        async with self._session.lock:
-            await self._session.set_loser_visibility("muck")
-            view = ClubPokerPrivateView(self._session, self._user_id)
-            await interaction.response.edit_message(embed=view.build_embed(), view=view)
+    def _call_bet(self):
+        return self._run(lambda: self._session.call_bet(self._user_id))
+
+    def _fold_hand(self):
+        return self._run(lambda: self._session.fold_hand(self._user_id))
+
+    def _show_hand(self):
+        return self._run(lambda: self._session.set_loser_visibility("show"))
+
+    def _muck_hand(self):
+        return self._run(lambda: self._session.set_loser_visibility("muck"))
