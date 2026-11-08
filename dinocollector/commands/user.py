@@ -36,7 +36,17 @@ class User(MixinMeta):
             
         # Sort by total_ever_claimed descending
         users_data.sort(key=lambda x: x[1].total_ever_claimed, reverse=True)
-        
+
+        # Find the command author's position for the footer
+        author_rank = next(
+            (i for i, (user_id, _) in enumerate(users_data, start=1) if user_id == ctx.author.id),
+            None,
+        )
+        if author_rank:
+            rank_text = f"Your rank: #{author_rank} of {len(users_data)}"
+        else:
+            rank_text = "Your rank: Unranked (claim a dino to join!)"
+
         # Pagination logic
         per_page = 5
         pages = []
@@ -62,9 +72,9 @@ class User(MixinMeta):
                 )
             
             embed.description = description
-            embed.set_footer(text=f"Page {page_num + 1}/{num_pages}")
+            embed.set_footer(text=f"Page {page_num + 1}/{num_pages} • {rank_text}")
             pages.append(embed)
-            
+
         view = LeaderboardView(pages, ctx.author)
         msg = await ctx.send(embed=pages[0], view=view)
         view.message = msg
