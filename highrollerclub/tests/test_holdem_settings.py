@@ -61,9 +61,12 @@ def test_buyin_range():
     conf = GuildSettings()
     assert holdem_buyin_range(conf, 200) == (4000, 20000)
     assert holdem_buyin_range(conf, 1500) == (30000, 150000)
-    conf.holdem_min_buyin_bb = 5          # below the 10 BB floor
-    conf.holdem_max_buyin_bb = 8          # and below the minimum
-    assert holdem_buyin_range(conf, 200) == (2000, 2000)
+    conf.holdem_min_buyin_bb = 5          # exactly the 5 BB floor
+    conf.holdem_max_buyin_bb = 100
+    assert holdem_buyin_range(conf, 200) == (1000, 20000)
+    conf.holdem_min_buyin_bb = 3          # below the 5 BB floor
+    conf.holdem_max_buyin_bb = 4          # and below the minimum
+    assert holdem_buyin_range(conf, 200) == (1000, 1000)
 
 
 def test_award_prestige_switch():
