@@ -63,6 +63,8 @@ log = logging.getLogger("red.highrollerclub.clubpoker")
 
 # Seconds a player has to make each decision before the game acts for them.
 ACTION_SECONDS = 90
+# Seconds the challenged player has to accept or decline.
+CHALLENGE_SECONDS = 300
 
 
 _CP_WIN_FLAVOR: dict[str, str] = {
@@ -803,7 +805,7 @@ class ClubPokerView(discord.ui.View):
                 f"**Ante:** {bet:,} {self._cached_currency or 'chips'} each\n"
                 "Private 5-card draw, then one betting round.\n\n"
                 f"{challenged_member.mention} -- accept or decline below.\n"
-                "*This challenge expires in 5 minutes.*"
+                f"*This challenge expires <t:{int((datetime.now(timezone.utc) + timedelta(seconds=CHALLENGE_SECONDS)).timestamp())}:R>.*"
             ),
         )
         if url := embed_image("clubpoker"):
@@ -870,7 +872,7 @@ class ClubPokerChallengeView(discord.ui.View):
         currency: str,
         challenger_interaction: discord.Interaction,
     ) -> None:
-        super().__init__(timeout=300)
+        super().__init__(timeout=CHALLENGE_SECONDS)
         # The challenger's own interaction (their challenge form). Only it can send them a
         # private message, so it's how their hand is delivered when the challenge is accepted.
         self._challenger_interaction = challenger_interaction
