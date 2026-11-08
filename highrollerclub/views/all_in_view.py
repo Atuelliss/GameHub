@@ -495,16 +495,24 @@ class AllInView(discord.ui.View):
                 win_pct    = f"{win_chance * 100:.0f}%"
                 rows.append(f"{t:<5}  {data['name']:<12}  {win_pct:<6}  {data['payout']}×")
 
-            desc += f"```\n{nl.join(rows)}\n```"
-
+            details = ""
             mul = get_pending_multiplier(user)
             if mul is not None:
-                desc += (
+                details += (
                     f"\n⚡ Bonus snapshot: **{mul}×** multiplier "
                     "*(stored on your account, but Multiplier Wheel does not apply to All-In)*"
                 )
             if has_bonus_bet_token(user):
-                desc += "\n🎫 Bonus snapshot: Bonus Bet Token doubles your winnings if it is still unused when a Tier 1-2 win resolves."
+                details += "\n🎫 Bonus snapshot: Bonus Bet Token doubles your winnings if it is still unused when a Tier 1-2 win resolves."
+
+            # The description sits beside the thumbnail on mobile, which squeezes
+            # code blocks. The tier table goes in a field below it so it gets the
+            # full embed width.
+            e.add_field(
+                name="Risk Tiers",
+                value=f"```\n{nl.join(rows)}\n```{details}",
+                inline=False,
+            )
 
         e.description = desc
 
