@@ -78,11 +78,13 @@ class User(Base):
     total_losses: int = 0
     largest_single_payout: int = 0  # largest single win (profit) ever
     largest_single_loss: int = 0    # largest single bet amount lost in one game
+    total_wagered: int = 0          # total staked on every win and loss (neutral pushes/ties aren't counted)
     # Per-game stats — keyed by game slug; populated on first play         
     game_play_counts: dict[str, int] = Field(default_factory=dict)
     game_win_counts: dict[str, int] = Field(default_factory=dict)
     game_loss_counts: dict[str, int] = Field(default_factory=dict)
     game_total_payout: dict[str, int] = Field(default_factory=dict)
+    game_total_wagered: dict[str, int] = Field(default_factory=dict)  # per-game total_wagered
     game_highest_single_payout: dict[str, int] = Field(default_factory=dict)
     game_highest_bet: dict[str, int] = Field(default_factory=dict)
     game_highest_single_loss: dict[str, int] = Field(default_factory=dict) # Favorite game = max(game_play_counts, key=game_play_counts.get) — computed at render time, never stored.

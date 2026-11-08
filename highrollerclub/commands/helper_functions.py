@@ -276,6 +276,13 @@ def holdem_buyin_range(conf: GuildSettings, big_blind: int) -> tuple[int, int]:
 # Prestige / stat recording
 # ---------------------------------------------------------------------------
 
+def add_wagered(user: User, game_slug: str, amount: int) -> None:
+    """Add a stake to the player's lifetime and per-game total wagered."""
+    amount = max(0, amount)
+    user.total_wagered += amount
+    user.game_total_wagered[game_slug] = user.game_total_wagered.get(game_slug, 0) + amount
+
+
 def record_win(
     conf: GuildSettings, user: User, game_slug: str, payout: int, bet: int, *, award_prestige: bool = True
 ) -> None:
@@ -300,6 +307,7 @@ def record_win(
     user.game_play_counts[game_slug] = user.game_play_counts.get(game_slug, 0) + 1
     user.game_win_counts[game_slug] = user.game_win_counts.get(game_slug, 0) + 1
     user.game_total_payout[game_slug] = user.game_total_payout.get(game_slug, 0) + winnings
+    add_wagered(user, game_slug, bet)
 
     if winnings > user.largest_single_payout:
         user.largest_single_payout = winnings
@@ -313,13 +321,22 @@ def record_win(
 
 
 def record_loss(
-    conf: GuildSettings, user: User, game_slug: str, amount_lost: int, *, award_prestige: bool = True
+    conf: GuildSettings,
+    user: User,
+    game_slug: str,
+    amount_lost: int,
+    *,
+    award_prestige: bool = True,
+    wagered: int | None = None,
 ) -> None:
     """Records a game loss: increments lifetime and per-game stats, updates
     personal records, resets win streak, subtracts prestige points
     (floored at 0.0) and uses up a pending Multiplier Wheel boost on eligible games.
 
     award_prestige=False records every stat but leaves prestige alone (see record_win).
+
+    wagered is what the player staked, when that isn't amount_lost: a Hold'em
+    player who got part of their chips back, or a free spin that cost nothing.
 
     Does NOT call evaluate_rank — caller is responsible for that after this
     function returns.
@@ -329,6 +346,7 @@ def record_loss(
 
     user.game_play_counts[game_slug] = user.game_play_counts.get(game_slug, 0) + 1
     user.game_loss_counts[game_slug] = user.game_loss_counts.get(game_slug, 0) + 1
+    add_wagered(user, game_slug, amount_lost if wagered is None else wagered)
 
     if amount_lost > user.largest_single_loss:
         user.largest_single_loss = amount_lost

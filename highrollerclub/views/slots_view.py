@@ -493,7 +493,7 @@ class SlotsView(discord.ui.View):
                 cancel_lucky_streak(user)
                 streak_cancelled = True
 
-            record_loss(conf, user, "slots", bet)
+            record_loss(conf, user, "slots", bet, wagered=0 if using_free_spin else bet)
 
         # 8. Rank evaluation.
         new_rank  = evaluate_rank(conf, user)

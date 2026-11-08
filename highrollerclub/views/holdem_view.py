@@ -516,7 +516,7 @@ class HoldemTable:
             if put_in > 0 and net > 0:
                 record_win(conf, user, "holdem", result.payouts[uid], put_in, award_prestige=counted)
             elif put_in > 0 and net < 0:
-                record_loss(conf, user, "holdem", -net, award_prestige=counted)
+                record_loss(conf, user, "holdem", -net, award_prestige=counted, wagered=put_in)
             if uid in result.royal_flushes:
                 user.holdem_royal_flushes += 1      # pure luck: counts at any table size
             if counted:
